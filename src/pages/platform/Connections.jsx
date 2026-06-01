@@ -1,14 +1,26 @@
 // Conexões — OAuth Meta Ads com seleção de conta de anúncios
 import { useState } from 'react'
-import { IconBrandFacebook, IconUnlink, IconExternalLink, IconCheck, IconAlertCircle } from '@tabler/icons-react'
+import {
+  IconBrandFacebook,
+  IconUnlink,
+  IconExternalLink,
+  IconCheck,
+  IconAlertCircle,
+  IconInfoCircle,
+} from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
 import { useMeta } from '../../context/MetaContext'
 import { formatDateTime } from '../../utils/formatters'
 
-export default function Connections() {
-  const { isConnected, connection, loadingConnection, connecting, error, startConnect, saveConnection, disconnect } = useMeta()
+const isPopupError = (msg) =>
+  msg && (msg.toLowerCase().includes('popup') || msg.toLowerCase().includes('bloqueado') || msg.toLowerCase().includes('não respondeu'))
 
-  // Etapa do fluxo: 'idle' | 'selecting' | 'saving'
+export default function Connections() {
+  const {
+    isConnected, connection, loadingConnection,
+    connecting, error, startConnect, saveConnection, disconnect,
+  } = useMeta()
+
   const [step, setStep] = useState('idle')
   const [availableAccounts, setAvailableAccounts] = useState([])
   const [pendingToken, setPendingToken] = useState(null)
@@ -16,7 +28,7 @@ export default function Connections() {
   const [saving, setSaving] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
 
-  const appIdMissing = false
+  const displayError = localError || error
 
   const handleConnect = async () => {
     setLocalError(null)
@@ -27,7 +39,6 @@ export default function Connections() {
         return
       }
       if (accounts.length === 1) {
-        // Só tem uma conta — salva direto
         setSaving(true)
         await saveConnection(accessToken, accounts[0])
         setSaving(false)
@@ -73,16 +84,16 @@ export default function Connections() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      {/* Aviso App ID não configurado */}
-      {appIdMissing && (
-        <div className="flex items-start gap-3 p-4 bg-status-warningBg border border-status-warning rounded-card">
-          <IconAlertCircle size={18} className="text-status-warning shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-txt-primary">Facebook App ID não configurado</p>
-            <p className="text-xs text-txt-secondary mt-1">
-              Adicione <code className="bg-white px-1 rounded">VITE_META_APP_ID=seu_app_id</code> no arquivo <code className="bg-white px-1 rounded">.env</code> e reinicie o servidor. Você receberá o App ID ao criar o app no{' '}
-              <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-brand-500 underline">Meta for Developers</a>.
-            </p>
+
+      {/* Aviso: como funciona */}
+      {!isConnected && (
+        <div className="flex items-start gap-3 p-4 bg-brand-50 border border-brand-100 rounded-card">
+          <IconInfoCircle size={18} className="text-brand-500 shrink-0 mt-0.5" />
+          <div className="text-xs text-txt-secondary space-y-1">
+            <p className="font-medium text-txt-primary text-sm">Como conectar</p>
+            <p>1. Clique em <strong>Conectar Meta Ads</strong> — um popup do Facebook vai abrir.</p>
+            <p>2. Se o popup <strong>não abrir</strong>, clique no ícone de popup bloqueado na barra de endereço e permita para <strong>gespub.online</strong>.</p>
+            <p>3. Autorize as permissões e selecione a conta de anúncios.</p>
           </div>
         </div>
       )}
@@ -96,16 +107,28 @@ export default function Connections() {
           <div className="flex-1">
             <h2 className="text-base font-semibold text-txt-primary">Meta Ads</h2>
             <p className="text-sm text-txt-secondary mt-1">
-              Conecte seu Gerenciador de Anúncios do Facebook/Instagram para ver campanhas reais, métricas e fazer edições diretamente pela plataforma.
+              Conecte seu Gerenciador de Anúncios do Facebook/Instagram para ver campanhas reais,
+              métricas e fazer edições diretamente pela plataforma.
             </p>
           </div>
         </div>
 
         {/* Erro */}
-        {(localError || error) && (
-          <div className="mt-4 flex items-start gap-2 px-3 py-2 bg-status-errorBg border border-status-error rounded-input">
-            <IconAlertCircle size={16} className="text-status-error shrink-0 mt-0.5" />
-            <p className="text-sm text-status-error">{localError || error}</p>
+        {displayError && (
+          <div className="mt-4 space-y-2">
+            <div className="flex items-start gap-2 px-3 py-2 bg-status-errorBg border border-status-error rounded-input">
+              <IconAlertCircle size={16} className="text-status-error shrink-0 mt-0.5" />
+              <p className="text-sm text-status-error">{displayError}</p>
+            </div>
+
+            {/* Instrução extra se for erro de popup */}
+            {isPopupError(displayError) && (
+              <div className="px-3 py-2 bg-status-warningBg border border-status-warning rounded-input text-xs text-txt-secondary">
+                <strong className="text-txt-primary">Para permitir popups no Chrome:</strong>{' '}
+                clique no ícone <strong>🚫</strong> ou <strong>⊕</strong> na barra de endereço → &quot;Sempre permitir popups de gespub.online&quot; → OK.
+                Depois clique em Conectar novamente.
+              </div>
+            )}
           </div>
         )}
 
@@ -114,10 +137,10 @@ export default function Connections() {
           <div className="mt-5">
             <Button
               onClick={handleConnect}
-              disabled={connecting || saving || appIdMissing}
+              disabled={connecting || saving}
               icon={IconBrandFacebook}
             >
-              {connecting ? 'Conectando…' : saving ? 'Salvando…' : 'Conectar Meta Ads'}
+              {connecting ? 'Abrindo popup…' : saving ? 'Salvando…' : 'Conectar Meta Ads'}
             </Button>
             <p className="mt-2 text-xs text-txt-secondary">
               Permissões necessárias: <strong>ads_management</strong> e <strong>pages_read_engagement</strong>
@@ -128,9 +151,7 @@ export default function Connections() {
         {/* Estado: selecionando conta */}
         {step === 'selecting' && (
           <div className="mt-5 space-y-3">
-            <p className="text-sm font-medium text-txt-primary">
-              Selecione a conta de anúncios:
-            </p>
+            <p className="text-sm font-medium text-txt-primary">Selecione a conta de anúncios:</p>
             {availableAccounts.map((acc) => (
               <button
                 key={acc.id}
@@ -189,11 +210,7 @@ export default function Connections() {
               >
                 {disconnecting ? 'Desconectando…' : 'Desconectar'}
               </Button>
-              <a
-                href="https://business.facebook.com/adsmanager"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href="https://business.facebook.com/adsmanager" target="_blank" rel="noopener noreferrer">
                 <Button variant="ghost" size="sm" icon={IconExternalLink}>
                   Abrir Gerenciador de Anúncios
                 </Button>
@@ -202,7 +219,6 @@ export default function Connections() {
           </div>
         )}
       </div>
-
 
       {/* Em breve */}
       <div>
