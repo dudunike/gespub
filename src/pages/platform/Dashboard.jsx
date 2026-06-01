@@ -57,7 +57,7 @@ export default function Dashboard() {
   const [insights, setInsights] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [datePreset, setDatePreset] = useState('last_30d')
+  const [datePreset, setDatePreset] = useState('today')
   const [timeRange, setTimeRange]   = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [agentsCount, setAgentsCount] = useState(0)
