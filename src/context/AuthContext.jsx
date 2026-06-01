@@ -156,6 +156,34 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  // Cadastro de novo usuário
+  const signup = useCallback(async (name, email, password) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      })
+      if (error) {
+        if (error.code === 'user_already_exists') return { success: false, error: 'E-mail já cadastrado.' }
+        return { success: false, error: error.message }
+      }
+      // Cria perfil básico
+      if (data.user) {
+        await supabase.from('profiles').upsert({
+          id:   data.user.id,
+          name,
+          role: 'user',
+          plan: 'starter',
+          status: 'active',
+        })
+      }
+      return { success: true, needsConfirmation: !data.session }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  }, [])
+
   const logout = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
@@ -190,7 +218,7 @@ export function AuthProvider({ children }) {
 
   const isAdmin = user?.role === 'admin'
 
-  const value = { user, isAuthenticated, isAdmin, login, logout, loading, resetPassword, updateAvatar }
+  const value = { user, isAuthenticated, isAdmin, login, signup, logout, loading, resetPassword, updateAvatar }
 
   if (loading) {
     return (

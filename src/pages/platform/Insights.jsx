@@ -139,7 +139,56 @@ export default function Insights() {
     setLoading(true); setError(null)
     try {
       const data = await getCampaignInsights(accountId, accessToken, datePreset)
-      const generated = generateInsights(data)
+      if (!data.length) { setInsights([]); return }
+
+      // Tenta Gemini primeiro; fallback para algoritmo local
+      let generated = []
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const resp = await fetch('/api/insights-ai', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            campaigns: data,
+            dateLabel: DATE_PRESETS.find(p => p.id === datePreset)?.label || datePreset,
+            currency: 'BRL',
+          }),
+        })
+        if (resp.ok) {
+          const ai = await resp.json()
+          // Converte resposta Gemini para formato interno
+          generated = (ai.insights || []).map((ins, i) => ({
+            id: `ai_${i}_${Date.now()}`,
+            type:        ins.tipo === 'oportunidade' ? 'opportunity' : ins.tipo === 'alerta' ? 'warning' : 'info',
+            title:       ins.titulo,
+            campaignName: ins.campanha || null,
+            campaignId:  data.find(c => c.campaign_name === ins.campanha)?.campaign_id || null,
+            analysis:    ins.analise,
+            action:      'open_manager',
+            priority:    ins.prioridade || 3,
+            aiGenerated: true,
+          }))
+          if (ai.resumo) generated.unshift({
+            id: 'ai_summary',
+            type: 'info',
+            title: 'Resumo do período',
+            analysis: ai.resumo,
+            campaignName: null,
+            campaignId: null,
+            priority: 0,
+            aiGenerated: true,
+          })
+        } else {
+          throw new Error('Gemini indisponível')
+        }
+      } catch {
+        // Fallback: algoritmo local
+        generated = generateInsights(data)
+      }
+
       setInsights(generated)
       if (generated.length > 0 && user) {
         const n = insightsUsed + 1

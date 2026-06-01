@@ -7,17 +7,17 @@ import Button from '../components/ui/Button'
 export default function Login() {
   const navigate = useNavigate()
   const { login, resetPassword } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [showReset, setShowReset] = useState(false)
 
-  const handleSubmit = async (e) => {
+  const [showReset, setShowReset] = useState(false)
+  const [email, setEmail]         = useState('')
+  const [password, setPassword]   = useState('')
+  const [error, setError]         = useState('')
+  const [info, setInfo]           = useState('')
+  const [loading, setLoading]     = useState(false)
+
+  const handleLogin = async (e) => {
     e.preventDefault()
-    setError('')
-    setInfo('')
+    setError(''); setInfo('')
     if (!email || !password) { setError('Preencha todos os campos.'); return }
     setLoading(true)
     const result = await login(email, password)
@@ -26,126 +26,67 @@ export default function Login() {
     else setError(result.error)
   }
 
-  const handleResetPassword = async (e) => {
+  const handleReset = async (e) => {
     e.preventDefault()
-    setError('')
-    setInfo('')
-    if (!email) { setError('Informe seu e-mail para redefinir a senha.'); return }
+    setError(''); setInfo('')
+    if (!email) { setError('Informe seu e-mail.'); return }
     setLoading(true)
     const result = await resetPassword(email)
     setLoading(false)
     if (result.success) {
-      setInfo('E-mail de redefinição enviado. Verifique sua caixa de entrada.')
+      setInfo('Link enviado! Verifique sua caixa de entrada.')
       setShowReset(false)
-    } else {
-      setError(result.error)
-    }
+    } else { setError(result.error) }
   }
 
   return (
     <div className="min-h-screen bg-surface-bg flex flex-col items-center justify-center px-4">
-      {/* Logo */}
       <div className="flex items-center gap-3 mb-2">
         <img src="/favicon.svg" alt="GesPub.ai" className="w-12 h-12 rounded-xl" />
         <span className="text-2xl font-bold text-txt-primary">
           GesPub<span className="text-brand-500">.ai</span>
         </span>
       </div>
-
       <p className="text-sm text-txt-secondary mb-8">Gestão inteligente de anúncios</p>
 
       <div className="w-full max-w-sm bg-white border border-border rounded-card p-8">
         {!showReset ? (
           <>
             <h1 className="text-base font-semibold text-txt-primary mb-5">Entrar na plataforma</h1>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="px-3 py-2 text-sm text-status-error bg-status-errorBg rounded-input">
-                  {error}
-                </div>
-              )}
-              {info && (
-                <div className="px-3 py-2 text-sm text-status-success bg-status-successBg rounded-input">
-                  {info}
-                </div>
-              )}
-
-              <Input
-                label="E-mail"
-                type="email"
-                name="email"
-                autoComplete="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-
-              <Input
-                label="Senha"
-                type="password"
-                name="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-
+            <form onSubmit={handleLogin} className="space-y-4">
+              {error && <p className="px-3 py-2 text-sm text-status-error bg-status-errorBg rounded-input">{error}</p>}
+              {info  && <p className="px-3 py-2 text-sm text-status-success bg-status-successBg rounded-input">{info}</p>}
+              <Input label="E-mail" type="email" autoComplete="email" placeholder="seu@email.com"
+                value={email} onChange={e => setEmail(e.target.value)} required />
+              <Input label="Senha" type="password" autoComplete="current-password" placeholder="••••••••"
+                value={password} onChange={e => setPassword(e.target.value)} required />
               <Button type="submit" fullWidth disabled={loading}>
                 {loading ? 'Entrando…' : 'Entrar'}
               </Button>
             </form>
-
             <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => { setShowReset(true); setError(''); setInfo('') }}
-                className="text-sm text-brand-500 hover:text-brand-700 transition-colors"
-              >
+              <button onClick={() => { setShowReset(true); setError(''); setInfo('') }}
+                className="text-sm text-brand-500 hover:text-brand-700 transition-colors">
                 Esqueci minha senha
               </button>
             </div>
-
             <p className="mt-6 text-center text-xs text-txt-secondary">
-              Acesso restrito por convite
+              Acesso restrito — disponível mediante assinatura
             </p>
           </>
         ) : (
           <>
             <h1 className="text-base font-semibold text-txt-primary mb-1">Redefinir senha</h1>
-            <p className="text-sm text-txt-secondary mb-5">
-              Informe seu e-mail e enviaremos um link de redefinição.
-            </p>
-
-            <form onSubmit={handleResetPassword} className="space-y-4">
-              {error && (
-                <div className="px-3 py-2 text-sm text-status-error bg-status-errorBg rounded-input">
-                  {error}
-                </div>
-              )}
-
-              <Input
-                label="E-mail"
-                type="email"
-                name="email"
-                autoComplete="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-
+            <p className="text-sm text-txt-secondary mb-5">Enviaremos um link de redefinição para seu e-mail.</p>
+            <form onSubmit={handleReset} className="space-y-4">
+              {error && <p className="px-3 py-2 text-sm text-status-error bg-status-errorBg rounded-input">{error}</p>}
+              <Input label="E-mail" type="email" autoComplete="email" placeholder="seu@email.com"
+                value={email} onChange={e => setEmail(e.target.value)} required />
               <Button type="submit" fullWidth disabled={loading}>
-                {loading ? 'Enviando…' : 'Enviar link de redefinição'}
+                {loading ? 'Enviando…' : 'Enviar link'}
               </Button>
-
-              <button
-                type="button"
-                onClick={() => { setShowReset(false); setError('') }}
-                className="w-full text-sm text-txt-secondary hover:text-txt-primary transition-colors text-center"
-              >
+              <button type="button" onClick={() => { setShowReset(false); setError('') }}
+                className="w-full text-sm text-txt-secondary hover:text-txt-primary transition-colors text-center">
                 Voltar ao login
               </button>
             </form>
@@ -153,17 +94,11 @@ export default function Login() {
         )}
       </div>
 
-      {/* Links de política */}
       <div className="mt-6 flex items-center gap-4 text-xs text-txt-secondary">
-        <Link to="/politica-de-privacidade" className="hover:text-brand-500 transition-colors">
-          Política de Privacidade
-        </Link>
+        <Link to="/politica-de-privacidade" className="hover:text-brand-500 transition-colors">Política de Privacidade</Link>
         <span>·</span>
-        <Link to="/termos-de-uso" className="hover:text-brand-500 transition-colors">
-          Termos de Uso
-        </Link>
+        <Link to="/termos-de-uso" className="hover:text-brand-500 transition-colors">Termos de Uso</Link>
       </div>
-
       <p className="mt-3 text-xs text-txt-secondary">© {new Date().getFullYear()} GesPub.ai</p>
     </div>
   )
