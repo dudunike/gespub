@@ -4,15 +4,17 @@ const BASE = 'https://graph.facebook.com/v21.0'
 
 async function apiFetch(path, token, params = {}, method = 'GET', body = null) {
   const url = new URL(`${BASE}${path}`)
-  url.searchParams.set('access_token', token)
   if (method === 'GET') {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
   }
 
-  const options = { method }
+  const options = {
+    method,
+    headers: { Authorization: `Bearer ${token}` },
+  }
   if (body && method !== 'GET') {
-    options.headers = { 'Content-Type': 'application/json' }
-    options.body = JSON.stringify({ ...body, access_token: token })
+    options.headers['Content-Type'] = 'application/json'
+    options.body = JSON.stringify(body)
   }
 
   const res = await fetch(url.toString(), options)
@@ -26,6 +28,18 @@ async function apiFetch(path, token, params = {}, method = 'GET', body = null) {
     throw new Error(`Meta API (${code}): ${msg}`)
   }
   return data
+}
+
+// ---------- VALIDAÇÃO DE TOKEN ----------
+
+// Verifica se o token ainda é válido consultando /me
+export async function checkTokenValid(token) {
+  try {
+    await apiFetch('/me', token, { fields: 'id' })
+    return true
+  } catch {
+    return false
+  }
 }
 
 // ---------- CONTAS DE ANÚNCIOS ----------

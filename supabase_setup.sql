@@ -5,14 +5,16 @@
 
 -- 1. Tabela de conexões Meta Ads (uma por usuário)
 create table if not exists meta_connections (
-  id          uuid default gen_random_uuid() primary key,
-  user_id     uuid references auth.users(id) on delete cascade not null unique,
+  id           uuid default gen_random_uuid() primary key,
+  user_id      uuid references auth.users(id) on delete cascade not null unique,
   access_token text not null,
-  account_id  text not null,
+  account_id   text not null,
   account_name text,
-  currency    text default 'BRL',
+  currency     text default 'BRL',
+  -- token_expires_at: null = token longo sem expiração conhecida
+  token_expires_at timestamptz,
   connected_at timestamptz default now(),
-  updated_at  timestamptz default now()
+  updated_at   timestamptz default now()
 );
 
 alter table meta_connections enable row level security;
@@ -61,9 +63,16 @@ create table if not exists profiles (
 
 alter table profiles enable row level security;
 
-create policy "Leitura pública de perfis"
+-- Usuário lê apenas o próprio perfil; admin lê todos
+create policy "Usuário lê próprio perfil"
   on profiles for select
-  using (true);
+  using (
+    auth.uid() = id
+    or exists (
+      select 1 from profiles p
+      where p.id = auth.uid() and p.role = 'admin'
+    )
+  );
 
 create policy "Usuário edita próprio perfil"
   on profiles for update
@@ -79,3 +88,31 @@ alter table profiles
   add column if not exists plan_expires_at timestamptz,
   add column if not exists insights_used_month int default 0,
   add column if not exists insights_reset_at   timestamptz default now();
+
+-- ============================================================
+-- ATUALIZAÇÃO: coluna de expiração do token Meta
+-- Execute separadamente se meta_connections já existir
+-- ============================================================
+
+alter table meta_connections
+  add column if not exists token_expires_at timestamptz;
+
+-- ============================================================
+-- 4. Tabela de notificações
+-- ============================================================
+
+create table if not exists notifications (
+  id         uuid default gen_random_uuid() primary key,
+  user_id    uuid references auth.users(id) on delete cascade not null,
+  title      text not null,
+  message    text,
+  type       text default 'info',   -- info, warning, success, error
+  read       boolean default false,
+  created_at timestamptz default now()
+);
+
+alter table notifications enable row level security;
+
+create policy "Usuário gerencia próprias notificações"
+  on notifications for all
+  using (auth.uid() = user_id);

@@ -1,7 +1,8 @@
 // Facebook JavaScript SDK — wrapper para OAuth com Meta
-// O App ID deve estar configurado em VITE_META_APP_ID no .env
 
 const META_API_VERSION = 'v21.0'
+const META_APP_ID = import.meta.env.VITE_META_APP_ID || '2456845514766257'
+
 // ads_management: leitura + edição de campanhas/orçamentos
 // pages_read_engagement: leitura de páginas vinculadas
 export const META_SCOPE = 'ads_management,pages_read_engagement'
@@ -12,12 +13,7 @@ export function loadFBSDK() {
   if (_sdkPromise) return _sdkPromise
 
   _sdkPromise = new Promise((resolve, reject) => {
-    const appId = import.meta.env.VITE_META_APP_ID
-
-    if (!appId || appId === 'SEU_APP_ID_AQUI') {
-      reject(new Error('Facebook App ID não configurado. Adicione VITE_META_APP_ID no arquivo .env'))
-      return
-    }
+    const appId = META_APP_ID
 
     // SDK já carregado
     if (window.FB && window._fbSDKReady) {
@@ -27,7 +23,7 @@ export function loadFBSDK() {
 
     window.fbAsyncInit = () => {
       window.FB.init({
-        appId,
+        appId: META_APP_ID,
         cookie: true,
         xfbml: false,
         version: META_API_VERSION,

@@ -16,7 +16,7 @@ export default function Connections() {
   const [saving, setSaving] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
 
-  const appIdMissing = !import.meta.env.VITE_META_APP_ID || import.meta.env.VITE_META_APP_ID === 'SEU_APP_ID_AQUI'
+  const appIdMissing = false
 
   const handleConnect = async () => {
     setLocalError(null)

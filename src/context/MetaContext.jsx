@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { fbLogin, fbLogout } from '../lib/metaSDK'
-import { getAdAccounts } from '../lib/metaApi'
+import { getAdAccounts, checkTokenValid } from '../lib/metaApi'
 import { useAuth } from './AuthContext'
 
 const MetaContext = createContext(null)
@@ -14,7 +14,7 @@ export function MetaProvider({ children }) {
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState(null)
 
-  // Carrega conexão salva no Supabase ao inicializar
+  // Carrega conexão salva no Supabase e valida token
   useEffect(() => {
     if (!user) {
       setConnection(null)
@@ -23,20 +23,40 @@ export function MetaProvider({ children }) {
     }
 
     let active = true
-    supabase
-      .from('meta_connections')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active) {
-          setConnection(data || null)
-          setLoadingConnection(false)
-        }
-      })
-      .catch(() => {
-        if (active) setLoadingConnection(false)
-      })
+
+    async function loadConnection() {
+      const { data } = await supabase
+        .from('meta_connections')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!active) return
+
+      if (!data) {
+        setConnection(null)
+        setLoadingConnection(false)
+        return
+      }
+
+      // Verifica se o token ainda é válido antes de expor
+      const isValid = await checkTokenValid(data.access_token)
+      if (!active) return
+
+      if (!isValid) {
+        // Token expirado — remove do banco e pede reconexão
+        await supabase.from('meta_connections').delete().eq('user_id', user.id)
+        setConnection(null)
+        setError('Sua conexão com a Meta expirou. Reconecte sua conta.')
+      } else {
+        setConnection(data)
+      }
+      setLoadingConnection(false)
+    }
+
+    loadConnection().catch(() => {
+      if (active) setLoadingConnection(false)
+    })
 
     return () => { active = false }
   }, [user])
