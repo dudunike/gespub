@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { IconRefresh, IconPlayerPlay, IconPlayerPause, IconEdit, IconExternalLink, IconAlertCircle, IconPlugConnected } from '@tabler/icons-react'
 import Tabs from '../../components/ui/Tabs'
 import Button from '../../components/ui/Button'
-import Select from '../../components/ui/Select'
+import DateFilter from '../../components/ui/DateFilter'
 import { useMeta } from '../../context/MetaContext'
 import {
   getCampaigns,
@@ -15,7 +15,6 @@ import {
   getActionValue,
   META_STATUS_LABELS,
   META_OBJECTIVE_LABELS,
-  DATE_PRESETS,
 } from '../../lib/metaApi'
 import { formatCurrency, formatPercent, formatRoas, formatNumber } from '../../utils/formatters'
 
@@ -91,6 +90,7 @@ export default function Campaigns() {
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('all')
   const [datePreset, setDatePreset] = useState('last_30d')
+  const [timeRange, setTimeRange]   = useState(null)
   const [editingBudget, setEditingBudget] = useState(null)
   const [toggling, setToggling] = useState({})   // campaignId → bool
 
@@ -101,7 +101,7 @@ export default function Campaigns() {
     try {
       const [rawCampaigns, rawInsights] = await Promise.all([
         getCampaigns(accountId, accessToken),
-        getCampaignInsights(accountId, accessToken, datePreset),
+        getCampaignInsights(accountId, accessToken, datePreset, timeRange),
       ])
       setCampaigns(rawCampaigns)
       // Indexar insights por campaign_id
@@ -113,7 +113,7 @@ export default function Campaigns() {
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, accountId, datePreset])
+  }, [isConnected, accessToken, accountId, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -189,17 +189,17 @@ export default function Campaigns() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Select
-            name="datePreset"
-            value={datePreset}
-            onChange={(e) => setDatePreset(e.target.value)}
-            options={DATE_PRESETS}
-          />
-          <Button variant="ghost" size="sm" onClick={loadData} disabled={loading} icon={IconRefresh}>
-            {loading ? 'Atualizando…' : 'Atualizar'}
-          </Button>
-        </div>
+        <DateFilter
+          preset={datePreset}
+          since={timeRange?.since}
+          until={timeRange?.until}
+          onChange={({ preset, since, until }) => {
+            setDatePreset(preset)
+            setTimeRange(since && until ? { since, until } : null)
+          }}
+          onRefresh={loadData}
+          loading={loading}
+        />
       </div>
 
       {/* Erro */}

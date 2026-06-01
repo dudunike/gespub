@@ -62,8 +62,16 @@ export async function getCampaigns(accountId, token) {
   return data.data || []
 }
 
+// Monta parâmetro de data — preset OU range personalizado
+function dateParams(datePreset, timeRange) {
+  if (timeRange?.since && timeRange?.until) {
+    return { time_range: JSON.stringify({ since: timeRange.since, until: timeRange.until }) }
+  }
+  return { date_preset: datePreset || 'last_30d' }
+}
+
 // Insights de campanhas (métricas reais, últimos 30 dias por padrão)
-export async function getCampaignInsights(accountId, token, datePreset = 'last_30d') {
+export async function getCampaignInsights(accountId, token, datePreset = 'last_30d', timeRange = null) {
   const fields = [
     'campaign_id',
     'campaign_name',
@@ -83,7 +91,7 @@ export async function getCampaignInsights(accountId, token, datePreset = 'last_3
   const data = await apiFetch(`/${accountId}/insights`, token, {
     fields,
     level: 'campaign',
-    date_preset: datePreset,
+    ...dateParams(datePreset, timeRange),
     limit: 200,
   })
   return data.data || []
@@ -112,7 +120,7 @@ export async function getAdSets(accountId, token, campaignId = null) {
   return data.data || []
 }
 
-export async function getAdSetInsights(accountId, token, datePreset = 'last_30d') {
+export async function getAdSetInsights(accountId, token, datePreset = 'last_30d', timeRange = null) {
   const fields = [
     'adset_id',
     'adset_name',
@@ -133,7 +141,7 @@ export async function getAdSetInsights(accountId, token, datePreset = 'last_30d'
   const data = await apiFetch(`/${accountId}/insights`, token, {
     fields,
     level: 'adset',
-    date_preset: datePreset,
+    ...dateParams(datePreset, timeRange),
     limit: 200,
   })
   return data.data || []
@@ -178,7 +186,7 @@ export async function getAdsWithCreatives(accountId, token) {
   return data.data || []
 }
 
-export async function getAdInsights(accountId, token, datePreset = 'last_30d') {
+export async function getAdInsights(accountId, token, datePreset = 'last_30d', timeRange = null) {
   const fields = [
     'ad_id',
     'ad_name',
@@ -201,7 +209,7 @@ export async function getAdInsights(accountId, token, datePreset = 'last_30d') {
   const data = await apiFetch(`/${accountId}/insights`, token, {
     fields,
     level: 'ad',
-    date_preset: datePreset,
+    ...dateParams(datePreset, timeRange),
     limit: 200,
   })
   return data.data || []

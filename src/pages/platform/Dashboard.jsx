@@ -4,13 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { IconPlugConnected, IconRefresh, IconRobot, IconAlertCircle, IconTrendingUp } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
-import Select from '../../components/ui/Select'
+import DateFilter from '../../components/ui/DateFilter'
 import { useMeta } from '../../context/MetaContext'
 import {
   getCampaignInsights,
   getActionCount,
   getActionValue,
-  DATE_PRESETS,
 } from '../../lib/metaApi'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
@@ -58,6 +57,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [datePreset, setDatePreset] = useState('last_30d')
+  const [timeRange, setTimeRange]   = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [agentsCount, setAgentsCount] = useState(0)
 
@@ -67,7 +67,7 @@ export default function Dashboard() {
     setLoading(true)
     setError(null)
     try {
-      const data = await getCampaignInsights(accountId, accessToken, datePreset)
+      const data = await getCampaignInsights(accountId, accessToken, datePreset, timeRange)
       setInsights(data)
       setLastUpdated(new Date())
     } catch (err) {
@@ -77,7 +77,10 @@ export default function Dashboard() {
     }
   }
 
-  useEffect(() => { loadInsights() }, [isConnected, accessToken, accountId, datePreset])
+  useEffect(() => {
+    if (datePreset === 'custom' && (!timeRange?.since || !timeRange?.until)) return
+    loadInsights()
+  }, [isConnected, accessToken, accountId, datePreset, timeRange])
 
   // Contagem de agentes ativos
   useEffect(() => {
@@ -184,22 +187,17 @@ export default function Dashboard() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Select
-            name="datePreset"
-            value={datePreset}
-            onChange={(e) => setDatePreset(e.target.value)}
-            options={DATE_PRESETS}
-          />
-          <button
-            onClick={loadInsights}
-            disabled={loading}
-            className="flex items-center gap-1.5 text-xs text-txt-secondary hover:text-brand-500 transition-colors disabled:opacity-50 px-2 py-1.5 rounded-input hover:bg-surface-bg"
-          >
-            <IconRefresh size={14} className={loading ? 'animate-spin' : ''} />
-            {loading ? 'Atualizando…' : 'Atualizar'}
-          </button>
-        </div>
+        <DateFilter
+          preset={datePreset}
+          since={timeRange?.since}
+          until={timeRange?.until}
+          onChange={({ preset, since, until }) => {
+            setDatePreset(preset)
+            setTimeRange(since && until ? { since, until } : null)
+          }}
+          onRefresh={loadInsights}
+          loading={loading}
+        />
       </div>
 
       {/* Erro */}

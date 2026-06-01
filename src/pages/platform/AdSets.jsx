@@ -7,7 +7,7 @@ import {
   IconPlugConnected,
 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
-import Select from '../../components/ui/Select'
+import DateFilter from '../../components/ui/DateFilter'
 import { useMeta } from '../../context/MetaContext'
 import {
   getCampaigns,
@@ -16,7 +16,7 @@ import {
   updateAdSetStatus,
   updateAdSetBudget,
   META_STATUS_LABELS,
-  DATE_PRESETS,
+
 } from '../../lib/metaApi'
 import { formatCurrency, formatNumber, formatPercent } from '../../utils/formatters'
 
@@ -83,6 +83,7 @@ export default function AdSets() {
   const [error,      setError]      = useState(null)
   const [campaignFilter, setCampaignFilter] = useState('')
   const [datePreset,     setDatePreset]     = useState('last_30d')
+  const [timeRange,      setTimeRange]      = useState(null)
   const [editingBudget,  setEditingBudget]  = useState(null)
   const [toggling,       setToggling]       = useState({})
 
@@ -92,7 +93,7 @@ export default function AdSets() {
     try {
       const [rawAdSets, rawInsights, rawCampaigns] = await Promise.all([
         getAdSets(accountId, accessToken),
-        getAdSetInsights(accountId, accessToken, datePreset),
+        getAdSetInsights(accountId, accessToken, datePreset, timeRange),
         getCampaigns(accountId, accessToken),
       ])
       setAdSets(rawAdSets)
@@ -105,7 +106,7 @@ export default function AdSets() {
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, accountId, datePreset])
+  }, [isConnected, accessToken, accountId, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -172,17 +173,17 @@ export default function AdSets() {
             />
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Select
-            name="datePreset"
-            value={datePreset}
-            onChange={(e) => setDatePreset(e.target.value)}
-            options={DATE_PRESETS}
-          />
-          <Button variant="ghost" size="sm" onClick={loadData} disabled={loading} icon={IconRefresh}>
-            {loading ? 'Atualizando…' : 'Atualizar'}
-          </Button>
-        </div>
+        <DateFilter
+          preset={datePreset}
+          since={timeRange?.since}
+          until={timeRange?.until}
+          onChange={({ preset, since, until }) => {
+            setDatePreset(preset)
+            setTimeRange(since && until ? { since, until } : null)
+          }}
+          onRefresh={loadData}
+          loading={loading}
+        />
       </div>
 
       {/* Erro */}

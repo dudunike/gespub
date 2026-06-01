@@ -8,7 +8,7 @@ import {
 } from '@tabler/icons-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import Select from '../../components/ui/Select'
+import DateFilter from '../../components/ui/DateFilter'
 import { useMeta } from '../../context/MetaContext'
 import {
   getAdsWithCreatives,
@@ -16,7 +16,7 @@ import {
   updateAdStatus,
   getActionCount,
   META_STATUS_LABELS,
-  DATE_PRESETS,
+
 } from '../../lib/metaApi'
 import { formatPercent, formatCurrency, formatNumber } from '../../utils/formatters'
 
@@ -100,6 +100,7 @@ export default function Ads() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [datePreset, setDatePreset] = useState('last_30d')
+  const [timeRange, setTimeRange]   = useState(null)
   const [toggling, setToggling] = useState({})
 
   const loadData = useCallback(async () => {
@@ -110,7 +111,7 @@ export default function Ads() {
     try {
       const [rawAds, rawInsights] = await Promise.all([
         getAdsWithCreatives(accountId, accessToken),
-        getAdInsights(accountId, accessToken, datePreset),
+        getAdInsights(accountId, accessToken, datePreset, timeRange),
       ])
 
       setAds(rawAds)
@@ -124,7 +125,7 @@ export default function Ads() {
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, accountId, datePreset])
+  }, [isConnected, accessToken, accountId, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -209,16 +210,18 @@ export default function Ads() {
           <span className="text-xs text-txt-secondary">{normalized.length} anúncios</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Select
-            name="datePreset"
-            value={datePreset}
-            onChange={(e) => setDatePreset(e.target.value)}
-            options={DATE_PRESETS}
+        <div className="flex items-center gap-2 flex-wrap">
+          <DateFilter
+            preset={datePreset}
+            since={timeRange?.since}
+            until={timeRange?.until}
+            onChange={({ preset, since, until }) => {
+              setDatePreset(preset)
+              setTimeRange(since && until ? { since, until } : null)
+            }}
+            onRefresh={loadData}
+            loading={loading}
           />
-          <Button variant="ghost" size="sm" onClick={loadData} disabled={loading} icon={IconRefresh}>
-            {loading ? 'Atualizando…' : 'Atualizar'}
-          </Button>
           {/* Toggle grid/lista */}
           <div className="flex border border-border rounded-input overflow-hidden">
             <button
@@ -341,7 +344,7 @@ export default function Ads() {
                     <StatusChip status={ad.status} />
                     {isConnected && (
                       <button
-                        onClick={() => handleToggle(displayAds.find((a) => a.id === ad.id))}
+                        onClick={() => handleToggle(ad)}
                         disabled={toggling[ad.id]}
                         className={`p-1.5 rounded-input transition-all disabled:opacity-40 ${
                           isActive
@@ -421,7 +424,7 @@ export default function Ads() {
                         {isConnected && (
                           <>
                             <button
-                              onClick={() => handleToggle(displayAds.find((a) => a.id === ad.id))}
+                              onClick={() => handleToggle(ad)}
                               disabled={toggling[ad.id]}
                               className={`p-1.5 rounded-input transition-all disabled:opacity-40 ${
                                 isActive ? 'text-status-warning hover:bg-status-warningBg' : 'text-status-success hover:bg-status-successBg'
