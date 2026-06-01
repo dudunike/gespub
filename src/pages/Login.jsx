@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Input from '../components/ui/Input'
@@ -6,7 +6,7 @@ import Button from '../components/ui/Button'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login, resetPassword } = useAuth()
+  const { login, resetPassword, isAuthenticated } = useAuth()
 
   const [showReset, setShowReset] = useState(false)
   const [email, setEmail]         = useState('')
@@ -15,15 +15,22 @@ export default function Login() {
   const [info, setInfo]           = useState('')
   const [loading, setLoading]     = useState(false)
 
+  // Navega assim que isAuthenticated vira true — garante timing correto
+  useEffect(() => {
+    if (isAuthenticated) navigate('/dashboard', { replace: true })
+  }, [isAuthenticated, navigate])
+
   const handleLogin = async (e) => {
     e.preventDefault()
     setError(''); setInfo('')
     if (!email || !password) { setError('Preencha todos os campos.'); return }
     setLoading(true)
     const result = await login(email, password)
-    setLoading(false)
-    if (result.success) navigate('/dashboard')
-    else setError(result.error)
+    if (!result.success) {
+      setLoading(false)
+      setError(result.error)
+    }
+    // Se success: mantém loading até o useEffect redirecionar
   }
 
   const handleReset = async (e) => {
