@@ -7,65 +7,73 @@ export const META_SCOPE = 'ads_management,pages_read_engagement'
 
 let _sdkPromise = null
 
-// Sempre chama FB.init() antes de resolver — evita "FB.login() called before FB.init()"
-function _initFB() {
-  window.FB.init({
-    appId:   META_APP_ID,
-    cookie:  true,
-    xfbml:   false,
-    version: META_API_VERSION,
-  })
+// Chama FB.init() e resolve a promise — só chamado após o script ter executado
+function _initAndResolve(resolve, reject) {
+  try {
+    window.FB.init({
+      appId:   META_APP_ID,
+      cookie:  true,
+      xfbml:   false,
+      version: META_API_VERSION,
+    })
+    resolve(window.FB)
+  } catch (err) {
+    _sdkPromise = null
+    reject(new Error('Erro ao inicializar Facebook SDK: ' + err.message))
+  }
 }
 
 export function loadFBSDK() {
   if (_sdkPromise) return _sdkPromise
 
   _sdkPromise = new Promise((resolve, reject) => {
-    // SDK já carregado → reinicializa (seguro chamar FB.init múltiplas vezes)
+
+    // SDK já foi carregado e executado nesta sessão
     if (window.FB) {
-      _initFB()
-      resolve(window.FB)
+      _initAndResolve(resolve, reject)
       return
     }
 
-    let timeoutId
-
-    const onReady = () => {
-      clearTimeout(timeoutId)
-      _initFB()
-      resolve(window.FB)
+    // Script já está no DOM mas ainda carregando — ouve o evento de load
+    const existing = document.getElementById('facebook-jssdk')
+    if (existing) {
+      existing.addEventListener('load', () => _initAndResolve(resolve, reject), { once: true })
+      existing.addEventListener('error', () => {
+        _sdkPromise = null
+        reject(new Error('Falha ao carregar o Facebook SDK.'))
+      }, { once: true })
+      return
     }
 
-    // Timeout de 15s caso o script não carregue
-    timeoutId = setTimeout(() => {
+    // Carrega o script pela primeira vez
+    const timeoutId = setTimeout(() => {
       _sdkPromise = null
       reject(new Error(
         'O Facebook SDK demorou demais para carregar. ' +
-        'Desative extensões de bloqueio de anúncios (uBlock, AdBlock) e recarregue a página.'
+        'Desative extensões de bloqueio de anúncios (uBlock, AdBlock) e tente novamente.'
       ))
-    }, 15000)
+    }, 15_000)
 
-    window.fbAsyncInit = onReady
+    const script = document.createElement('script')
+    script.id    = 'facebook-jssdk'
+    script.src   = 'https://connect.facebook.net/en_US/sdk.js'
+    script.async = true
 
-    // Só adiciona o script se ainda não estiver no DOM
-    if (!document.getElementById('facebook-jssdk')) {
-      const script = document.createElement('script')
-      script.id = 'facebook-jssdk'
-      script.src = 'https://connect.facebook.net/en_US/sdk.js'
-      script.async = true
-      script.defer = true
-      script.onerror = () => {
-        clearTimeout(timeoutId)
-        _sdkPromise = null
-        reject(new Error(
-          'Não foi possível carregar o Facebook SDK. ' +
-          'Verifique sua conexão ou desative extensões de bloqueio de anúncios.'
-        ))
-      }
-      document.head.appendChild(script)
-    }
-    // Se o script já está no DOM mas fbAsyncInit ainda não foi chamado,
-    // ficamos aguardando — o SDK chamará window.fbAsyncInit quando pronto.
+    script.addEventListener('load', () => {
+      clearTimeout(timeoutId)
+      _initAndResolve(resolve, reject)
+    }, { once: true })
+
+    script.addEventListener('error', () => {
+      clearTimeout(timeoutId)
+      _sdkPromise = null
+      reject(new Error(
+        'Não foi possível carregar o Facebook SDK. ' +
+        'Verifique sua conexão ou desative extensões de bloqueio de anúncios.'
+      ))
+    }, { once: true })
+
+    document.head.appendChild(script)
   })
 
   return _sdkPromise
@@ -75,11 +83,10 @@ export async function fbLogin() {
   const FB = await loadFBSDK()
 
   return new Promise((resolve, reject) => {
-    // Timeout de 2 minutos — tempo para o usuário interagir com o popup
     const timeoutId = setTimeout(() => {
       reject(new Error(
-        'O popup do Facebook não abriu ou não respondeu. ' +
-        'Permita popups para gespub.online no ícone ao lado da barra de endereço e tente novamente.'
+        'O popup do Facebook não respondeu. ' +
+        'Permita popups para gespub.online na barra de endereço e tente novamente.'
       ))
     }, 120_000)
 
@@ -91,8 +98,7 @@ export async function fbLogin() {
             resolve(response.authResponse)
           } else {
             reject(new Error(
-              'Login cancelado ou permissões não concedidas. ' +
-              'Clique em "Continuar" e autorize as permissões solicitadas.'
+              'Login cancelado. Autorize as permissões solicitadas para continuar.'
             ))
           }
         },
@@ -100,19 +106,11 @@ export async function fbLogin() {
       )
     } catch {
       clearTimeout(timeoutId)
-      // FB.login lança se o popup for bloqueado imediatamente
       reject(new Error(
         'Popup bloqueado pelo navegador. ' +
-        'Clique no ícone de popup na barra de endereço para permitir e tente novamente.'
+        'Permita popups para gespub.online e tente novamente.'
       ))
     }
-  })
-}
-
-export async function fbGetLoginStatus() {
-  const FB = await loadFBSDK()
-  return new Promise((resolve) => {
-    FB.getLoginStatus((response) => resolve(response))
   })
 }
 
@@ -121,6 +119,6 @@ export async function fbLogout() {
     const FB = await loadFBSDK()
     return new Promise((resolve) => FB.logout(resolve))
   } catch {
-    // SDK pode não estar disponível, tudo bem
+    // ok se SDK não estiver disponível
   }
 }

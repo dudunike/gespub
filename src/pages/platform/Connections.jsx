@@ -1,19 +1,13 @@
-// Conexões — OAuth Meta Ads com seleção de conta de anúncios
 import { useState } from 'react'
 import {
-  IconBrandFacebook,
-  IconUnlink,
-  IconExternalLink,
-  IconCheck,
-  IconAlertCircle,
-  IconInfoCircle,
+  IconBrandFacebook, IconUnlink, IconExternalLink,
+  IconCheck, IconAlertCircle, IconKey, IconChevronDown,
 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
 import { useMeta } from '../../context/MetaContext'
+import { getAdAccounts } from '../../lib/metaApi'
 import { formatDateTime } from '../../utils/formatters'
-
-const isPopupError = (msg) =>
-  msg && (msg.toLowerCase().includes('popup') || msg.toLowerCase().includes('bloqueado') || msg.toLowerCase().includes('não respondeu'))
 
 export default function Connections() {
   const {
@@ -21,20 +15,31 @@ export default function Connections() {
     connecting, error, startConnect, saveConnection, disconnect,
   } = useMeta()
 
-  const [step, setStep] = useState('idle')
+  const [step, setStep]                     = useState('idle')
   const [availableAccounts, setAvailableAccounts] = useState([])
-  const [pendingToken, setPendingToken] = useState(null)
-  const [localError, setLocalError] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [disconnecting, setDisconnecting] = useState(false)
+  const [pendingToken, setPendingToken]     = useState(null)
+  const [localError, setLocalError]         = useState(null)
+  const [saving, setSaving]                 = useState(false)
+  const [disconnecting, setDisconnecting]   = useState(false)
+
+  // Conexão manual via token
+  const [showManual, setShowManual]         = useState(false)
+  const [manualToken, setManualToken]       = useState('')
+  const [manualLoading, setManualLoading]   = useState(false)
 
   const displayError = localError || error
+  const isPopupErr   = displayError && (
+    displayError.toLowerCase().includes('popup') ||
+    displayError.toLowerCase().includes('bloqueado') ||
+    displayError.toLowerCase().includes('respondeu')
+  )
 
+  /* ── Conexão via popup OAuth ── */
   const handleConnect = async () => {
     setLocalError(null)
     try {
       const { accessToken, accounts } = await startConnect()
-      if (accounts.length === 0) {
+      if (!accounts.length) {
         setLocalError('Nenhuma conta de anúncios encontrada neste perfil do Facebook.')
         return
       }
@@ -42,7 +47,6 @@ export default function Connections() {
         setSaving(true)
         await saveConnection(accessToken, accounts[0])
         setSaving(false)
-        setStep('idle')
       } else {
         setPendingToken(accessToken)
         setAvailableAccounts(accounts)
@@ -50,6 +54,36 @@ export default function Connections() {
       }
     } catch (err) {
       setLocalError(err.message)
+    }
+  }
+
+  /* ── Conexão manual via token colado ── */
+  const handleManualConnect = async () => {
+    if (!manualToken.trim()) return
+    setLocalError(null)
+    setManualLoading(true)
+    try {
+      const accounts = await getAdAccounts(manualToken.trim())
+      if (!accounts.length) {
+        setLocalError('Nenhuma conta de anúncios encontrada com este token.')
+        return
+      }
+      if (accounts.length === 1) {
+        setSaving(true)
+        await saveConnection(manualToken.trim(), accounts[0])
+        setSaving(false)
+        setManualToken('')
+        setShowManual(false)
+      } else {
+        setPendingToken(manualToken.trim())
+        setAvailableAccounts(accounts)
+        setStep('selecting')
+        setShowManual(false)
+      }
+    } catch (err) {
+      setLocalError(err.message)
+    } finally {
+      setManualLoading(false)
     }
   }
 
@@ -85,19 +119,6 @@ export default function Connections() {
   return (
     <div className="max-w-2xl space-y-6">
 
-      {/* Aviso: como funciona */}
-      {!isConnected && (
-        <div className="flex items-start gap-3 p-4 bg-brand-50 border border-brand-100 rounded-card">
-          <IconInfoCircle size={18} className="text-brand-500 shrink-0 mt-0.5" />
-          <div className="text-xs text-txt-secondary space-y-1">
-            <p className="font-medium text-txt-primary text-sm">Como conectar</p>
-            <p>1. Clique em <strong>Conectar Meta Ads</strong> — um popup do Facebook vai abrir.</p>
-            <p>2. Se o popup <strong>não abrir</strong>, clique no ícone de popup bloqueado na barra de endereço e permita para <strong>gespub.online</strong>.</p>
-            <p>3. Autorize as permissões e selecione a conta de anúncios.</p>
-          </div>
-        </div>
-      )}
-
       {/* Card Meta Ads */}
       <div className="bg-white border border-border rounded-card p-6">
         <div className="flex items-start gap-4">
@@ -107,8 +128,8 @@ export default function Connections() {
           <div className="flex-1">
             <h2 className="text-base font-semibold text-txt-primary">Meta Ads</h2>
             <p className="text-sm text-txt-secondary mt-1">
-              Conecte seu Gerenciador de Anúncios do Facebook/Instagram para ver campanhas reais,
-              métricas e fazer edições diretamente pela plataforma.
+              Conecte seu Gerenciador de Anúncios do Facebook/Instagram para ver
+              campanhas reais, métricas e fazer edições diretamente pela plataforma.
             </p>
           </div>
         </div>
@@ -120,35 +141,92 @@ export default function Connections() {
               <IconAlertCircle size={16} className="text-status-error shrink-0 mt-0.5" />
               <p className="text-sm text-status-error">{displayError}</p>
             </div>
-
-            {/* Instrução extra se for erro de popup */}
-            {isPopupError(displayError) && (
-              <div className="px-3 py-2 bg-status-warningBg border border-status-warning rounded-input text-xs text-txt-secondary">
-                <strong className="text-txt-primary">Para permitir popups no Chrome:</strong>{' '}
-                clique no ícone <strong>🚫</strong> ou <strong>⊕</strong> na barra de endereço → &quot;Sempre permitir popups de gespub.online&quot; → OK.
-                Depois clique em Conectar novamente.
-              </div>
+            {isPopupErr && (
+              <p className="text-xs text-txt-secondary px-1">
+                Use a opção <strong>"Conectar com token"</strong> abaixo para conectar sem popup.
+              </p>
             )}
           </div>
         )}
 
-        {/* Estado: não conectado */}
+        {/* Não conectado */}
         {!isConnected && step === 'idle' && (
-          <div className="mt-5">
-            <Button
-              onClick={handleConnect}
-              disabled={connecting || saving}
-              icon={IconBrandFacebook}
-            >
-              {connecting ? 'Abrindo popup…' : saving ? 'Salvando…' : 'Conectar Meta Ads'}
-            </Button>
-            <p className="mt-2 text-xs text-txt-secondary">
-              Permissões necessárias: <strong>ads_management</strong> e <strong>pages_read_engagement</strong>
-            </p>
+          <div className="mt-5 space-y-4">
+
+            {/* Botão popup */}
+            <div>
+              <Button
+                onClick={handleConnect}
+                disabled={connecting || saving}
+                icon={IconBrandFacebook}
+              >
+                {connecting ? 'Abrindo popup…' : saving ? 'Salvando…' : 'Conectar com Facebook'}
+              </Button>
+              <p className="mt-1.5 text-xs text-txt-secondary">
+                Abre um popup do Facebook para autorizar o acesso.
+              </p>
+            </div>
+
+            {/* Divisor */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-txt-secondary">ou</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* Conexão via token */}
+            <div className="border border-border rounded-card overflow-hidden">
+              <button
+                onClick={() => setShowManual((s) => !s)}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-txt-secondary hover:bg-surface-bg transition-colors"
+              >
+                <IconKey size={16} stroke={1.5} className="text-txt-secondary shrink-0" />
+                <span className="flex-1 text-left font-medium text-txt-primary">
+                  Conectar com token de acesso
+                </span>
+                <IconChevronDown
+                  size={16}
+                  className={`transition-transform shrink-0 ${showManual ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {showManual && (
+                <div className="px-4 pb-4 space-y-3 border-t border-border">
+                  <p className="text-xs text-txt-secondary mt-3">
+                    Acesse{' '}
+                    <a
+                      href="https://developers.facebook.com/tools/explorer/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-500 hover:underline"
+                    >
+                      Graph API Explorer
+                    </a>
+                    , selecione seu app <strong>GesPub</strong>, clique em{' '}
+                    <strong>Generate Access Token</strong> e cole abaixo.
+                  </p>
+                  <Input
+                    label="Token de acesso do usuário"
+                    placeholder="EAAi6fOws97EB..."
+                    value={manualToken}
+                    onChange={(e) => setManualToken(e.target.value)}
+                  />
+                  <Button
+                    onClick={handleManualConnect}
+                    disabled={!manualToken.trim() || manualLoading || saving}
+                    icon={IconKey}
+                    fullWidth
+                  >
+                    {manualLoading ? 'Validando token…' : saving ? 'Salvando…' : 'Conectar com este token'}
+                  </Button>
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
-        {/* Estado: selecionando conta */}
+        {/* Selecionando conta */}
         {step === 'selecting' && (
           <div className="mt-5 space-y-3">
             <p className="text-sm font-medium text-txt-primary">Selecione a conta de anúncios:</p>
@@ -178,42 +256,29 @@ export default function Connections() {
           </div>
         )}
 
-        {/* Estado: conectado */}
+        {/* Conectado */}
         {isConnected && (
           <div className="mt-5 pt-5 border-t border-border space-y-3">
             <div className="flex items-center gap-2 text-status-success">
               <IconCheck size={16} />
               <span className="text-sm font-medium">Conta conectada</span>
             </div>
-
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <span className="text-txt-secondary">Conta</span>
               <span className="font-medium text-txt-primary">{connection.account_name}</span>
-
               <span className="text-txt-secondary">ID da conta</span>
               <span className="font-mono text-xs text-txt-primary">{connection.account_id}</span>
-
               <span className="text-txt-secondary">Moeda</span>
               <span className="text-txt-primary">{connection.currency}</span>
-
               <span className="text-txt-secondary">Conectado em</span>
               <span className="text-txt-primary">{formatDateTime(connection.connected_at)}</span>
             </div>
-
             <div className="pt-2 flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={IconUnlink}
-                onClick={handleDisconnect}
-                disabled={disconnecting}
-              >
+              <Button variant="secondary" size="sm" icon={IconUnlink} onClick={handleDisconnect} disabled={disconnecting}>
                 {disconnecting ? 'Desconectando…' : 'Desconectar'}
               </Button>
               <a href="https://business.facebook.com/adsmanager" target="_blank" rel="noopener noreferrer">
-                <Button variant="ghost" size="sm" icon={IconExternalLink}>
-                  Abrir Gerenciador de Anúncios
-                </Button>
+                <Button variant="ghost" size="sm" icon={IconExternalLink}>Abrir Gerenciador</Button>
               </a>
             </div>
           </div>
