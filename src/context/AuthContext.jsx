@@ -115,7 +115,6 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
-        // Traduz os códigos de erro mais comuns do Supabase
         if (error.code === 'invalid_credentials' || error.status === 400) {
           return { success: false, error: 'E-mail ou senha incorretos.' }
         }
@@ -125,19 +124,12 @@ export function AuthProvider({ children }) {
         return { success: false, error: error.message }
       }
 
-      // Tenta perfil na tabela profiles; cai para dados do auth se não existir
-      const profile =
-        (await fetchProfile(data.user.id, data.user.email)) ||
-        buildProfileFromSession(data.user)
-
-      if (profile.status === 'blocked') {
-        await supabase.auth.signOut()
-        return { success: false, error: 'Conta bloqueada. Entre em contato com o suporte.' }
-      }
-
-      setUser(profile)
+      // Define usuário básico imediatamente para navegação instantânea.
+      // onAuthStateChange buscará o perfil completo em background.
+      const basicUser = buildProfileFromSession(data.user)
+      setUser(basicUser)
       setIsAuthenticated(true)
-      return { success: true, user: profile }
+      return { success: true }
     } catch (err) {
       return { success: false, error: err.message || 'Erro ao conectar com o servidor.' }
     }

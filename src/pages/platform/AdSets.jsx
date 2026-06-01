@@ -7,6 +7,7 @@ import {
   IconPlugConnected,
 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
+import Select from '../../components/ui/Select'
 import DateFilter from '../../components/ui/DateFilter'
 import { useMeta } from '../../context/MetaContext'
 import {

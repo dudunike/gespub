@@ -24,7 +24,8 @@ export default function Connections() {
 
   // Detecta retorno do Facebook OAuth (token está no hash da URL)
   useEffect(() => {
-    if (isConnected) return
+    // Aguarda loadingConnection terminar para evitar conflito com conexão existente
+    if (loadingConnection) return
 
     const hash = window.location.hash
     if (!hash || !hash.includes('access_token')) return
@@ -59,7 +60,7 @@ export default function Connections() {
       })
       .catch((err) => setLocalError(err.message))
       .finally(() => setProcessingReturn(false))
-  }, [isConnected, saveConnection])
+  }, [loadingConnection, saveConnection])
 
   const handleSelectAccount = async (account) => {
     setSaving(true)
