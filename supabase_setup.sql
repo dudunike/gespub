@@ -116,3 +116,41 @@ alter table notifications enable row level security;
 create policy "Usuário gerencia próprias notificações"
   on notifications for all
   using (auth.uid() = user_id);
+
+-- ============================================================
+-- 5. Coluna de avatar na tabela profiles
+-- Execute separadamente se profiles já existir
+-- ============================================================
+
+alter table profiles
+  add column if not exists avatar_url text;
+
+-- ============================================================
+-- 6. Bucket de storage para fotos de perfil
+-- Execute no Supabase Dashboard → Storage → New Bucket
+-- OU cole este SQL no SQL Editor
+-- ============================================================
+
+insert into storage.buckets (id, name, public)
+  values ('avatars', 'avatars', true)
+  on conflict (id) do nothing;
+
+-- Política: usuário faz upload apenas no próprio path (user_id.ext)
+create policy "Upload próprio avatar"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars'
+    and auth.uid()::text = split_part(name, '.', 1)
+  );
+
+create policy "Update próprio avatar"
+  on storage.objects for update
+  using (
+    bucket_id = 'avatars'
+    and auth.uid()::text = split_part(name, '.', 1)
+  );
+
+-- Leitura pública das fotos (URLs públicas funcionam)
+create policy "Leitura pública de avatars"
+  on storage.objects for select
+  using (bucket_id = 'avatars');

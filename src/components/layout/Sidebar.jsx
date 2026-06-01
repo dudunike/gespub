@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import {
   IconLayoutDashboard,
@@ -10,13 +10,15 @@ import {
   IconAdjustments,
   IconSparkles,
   IconPlugConnected,
-  IconSettings,
+  IconLogout,
+  IconCamera,
+  IconChevronUp,
+  IconLoader2,
 } from '@tabler/icons-react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
 import Avatar from '../ui/Avatar'
 
-// Mapa de ícones para referência dinâmica
 const iconMap = {
   IconLayoutDashboard,
   IconSpeakerphone,
@@ -28,24 +30,32 @@ const iconMap = {
   IconPlugConnected,
 }
 
-// Itens de navegação
 const navItems = [
-  { label: 'Dashboard', path: '/dashboard', icon: 'IconLayoutDashboard' },
-  { label: 'Campanhas', path: '/campanhas', icon: 'IconSpeakerphone' },
-  { label: 'Conjuntos', path: '/conjuntos', icon: 'IconStack2' },
-  { label: 'Anúncios', path: '/anuncios', icon: 'IconPhoto' },
-  { label: 'Agentes IA', path: '/agentes', icon: 'IconRobot', showBadge: true },
-  { label: 'Regras', path: '/regras', icon: 'IconAdjustments' },
-  { label: 'Insights', path: '/insights', icon: 'IconSparkles' },
-  { label: 'Conexões', path: '/conexoes', icon: 'IconPlugConnected' },
+  { label: 'Dashboard',   path: '/dashboard', icon: 'IconLayoutDashboard' },
+  { label: 'Campanhas',   path: '/campanhas',  icon: 'IconSpeakerphone' },
+  { label: 'Conjuntos',   path: '/conjuntos',  icon: 'IconStack2' },
+  { label: 'Anúncios',    path: '/anuncios',   icon: 'IconPhoto' },
+  { label: 'Agentes IA',  path: '/agentes',    icon: 'IconRobot', showBadge: true },
+  { label: 'Regras',      path: '/regras',     icon: 'IconAdjustments' },
+  { label: 'Insights',    path: '/insights',   icon: 'IconSparkles' },
+  { label: 'Conexões',    path: '/conexoes',   icon: 'IconPlugConnected' },
 ]
 
+const planLabels = { starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise' }
+
 export default function Sidebar() {
-  const { user } = useAuth()
+  const { user, logout, updateAvatar } = useAuth()
   const { isSidebarOpen, closeSidebar } = useApp()
   const location = useLocation()
-  
+  const navigate = useNavigate()
+
   const [activeAgentsCount, setActiveAgentsCount] = useState(0)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  const menuRef = useRef(null)
+  const fileRef = useRef(null)
 
   useEffect(() => {
     if (!user) return
@@ -58,12 +68,45 @@ export default function Sidebar() {
       .catch(() => {})
   }, [user])
 
-  // Mapa de planos para exibição
-  const planLabels = {
-    starter: 'Starter',
-    pro: 'Pro',
-    enterprise: 'Enterprise',
-  }
+  // Fecha menu ao clicar fora
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
+
+  const handleLogout = useCallback(async () => {
+    setMenuOpen(false)
+    closeSidebar()
+    await logout()
+    navigate('/')
+  }, [logout, navigate, closeSidebar])
+
+  const handlePhotoChange = useCallback(async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Foto deve ter no máximo 2 MB.')
+      return
+    }
+
+    setUploading(true)
+    setUploadError('')
+    const result = await updateAvatar(file)
+    setUploading(false)
+
+    if (!result.success) setUploadError(result.error)
+    else setMenuOpen(false)
+
+    // Limpa input para permitir re-upload do mesmo arquivo
+    e.target.value = ''
+  }, [updateAvatar])
 
   return (
     <aside className={`
@@ -85,7 +128,6 @@ export default function Sidebar() {
         {navItems.map((item) => {
           const Icon = iconMap[item.icon]
           const isActive = location.pathname === item.path
-
           return (
             <NavLink
               key={item.path}
@@ -112,11 +154,80 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Rodapé — perfil do usuário */}
-      <div className="px-3 py-3 border-t border-border">
-        <div className="flex items-center gap-3 px-3 py-2">
-          <Avatar name={user?.name || 'Usuário'} size="sm" />
-          <div className="flex-1 min-w-0">
+      {/* Rodapé — perfil com dropdown */}
+      <div className="px-3 py-3 border-t border-border relative" ref={menuRef}>
+
+        {/* Dropdown — abre para cima */}
+        {menuOpen && (
+          <div className="absolute bottom-full left-3 right-3 mb-2 bg-white border border-border rounded-card shadow-lg overflow-hidden">
+
+            {/* Info do usuário */}
+            <div className="px-4 py-3 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Avatar
+                    src={user?.avatar_url}
+                    name={user?.name || 'Usuário'}
+                    size="md"
+                  />
+                  {uploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-full">
+                      <IconLoader2 size={16} className="animate-spin text-brand-500" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-txt-primary truncate">
+                    {user?.name || 'Usuário'}
+                  </p>
+                  <p className="text-xs text-txt-secondary truncate">{user?.email}</p>
+                </div>
+              </div>
+              {uploadError && (
+                <p className="mt-2 text-xs text-status-error">{uploadError}</p>
+              )}
+            </div>
+
+            {/* Alterar foto */}
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-txt-secondary hover:bg-surface-bg hover:text-txt-primary transition-colors disabled:opacity-50"
+            >
+              <IconCamera size={16} stroke={1.5} />
+              {uploading ? 'Enviando foto…' : 'Alterar foto de perfil'}
+            </button>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={handlePhotoChange}
+            />
+
+            {/* Sair */}
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-status-error hover:bg-status-errorBg transition-colors"
+            >
+              <IconLogout size={16} stroke={1.5} />
+              Sair da conta
+            </button>
+          </div>
+        )}
+
+        {/* Trigger do menu */}
+        <button
+          onClick={() => { setMenuOpen((o) => !o); setUploadError('') }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-input hover:bg-surface-bg transition-colors group"
+        >
+          <Avatar
+            src={user?.avatar_url}
+            name={user?.name || 'Usuário'}
+            size="sm"
+          />
+          <div className="flex-1 min-w-0 text-left">
             <p className="text-sm font-medium text-txt-primary truncate">
               {user?.name || 'Usuário'}
             </p>
@@ -124,13 +235,12 @@ export default function Sidebar() {
               {planLabels[user?.plan] || 'Starter'}
             </p>
           </div>
-          <NavLink
-            to="/configuracoes"
-            className="p-1 rounded-input text-txt-secondary hover:text-txt-primary hover:bg-surface-bg transition-all duration-150"
-          >
-            <IconSettings size={18} stroke={1.5} />
-          </NavLink>
-        </div>
+          <IconChevronUp
+            size={16}
+            stroke={1.5}
+            className={`text-txt-secondary shrink-0 transition-transform duration-150 ${menuOpen ? 'rotate-0' : 'rotate-180'}`}
+          />
+        </button>
       </div>
     </aside>
   )

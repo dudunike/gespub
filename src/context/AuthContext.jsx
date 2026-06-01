@@ -162,9 +162,35 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false)
   }, [])
 
+  // Faz upload da foto e atualiza perfil
+  const updateAvatar = useCallback(async (file) => {
+    if (!user) return { success: false, error: 'Não autenticado' }
+
+    const ext = file.name.split('.').pop()
+    const path = `${user.id}.${ext}`
+
+    const { error: uploadErr } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true, contentType: file.type })
+
+    if (uploadErr) return { success: false, error: uploadErr.message }
+
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('id', user.id)
+
+    if (updateErr) return { success: false, error: updateErr.message }
+
+    setUser((prev) => ({ ...prev, avatar_url: publicUrl }))
+    return { success: true, url: publicUrl }
+  }, [user])
+
   const isAdmin = user?.role === 'admin'
 
-  const value = { user, isAuthenticated, isAdmin, login, logout, loading, resetPassword }
+  const value = { user, isAuthenticated, isAdmin, login, logout, loading, resetPassword, updateAvatar }
 
   if (loading) {
     return (
