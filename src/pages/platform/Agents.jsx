@@ -4,6 +4,7 @@ import {
   IconRobot, IconSettings, IconPlus, IconTrash,
   IconLock, IconX, IconCheck, IconAlertCircle,
   IconPlugConnected, IconChevronDown, IconChevronUp,
+  IconHistory, IconPlayerPlay,
 } from '@tabler/icons-react'
 import Toggle from '../../components/ui/Toggle'
 import Badge from '../../components/ui/Badge'
@@ -514,6 +515,8 @@ export default function Agents() {
   const [editingAgent,  setEditingAgent]  = useState(null)
   const [initialForm,   setInitialForm]   = useState(null)
   const [deleting,      setDeleting]      = useState(null)
+  const [logs,          setLogs]          = useState([])
+  const [loadingLogs,   setLoadingLogs]   = useState(false)
 
   // Carregar agentes do Supabase
   const loadAgents = useCallback(async () => {
@@ -532,6 +535,27 @@ export default function Agents() {
       setLoadingAgents(false)
     }
   }, [user])
+
+  // Carregar logs de execução
+  const loadLogs = useCallback(async () => {
+    if (!user) return
+    setLoadingLogs(true)
+    try {
+      const { data } = await supabase
+        .from('agent_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('executed_at', { ascending: false })
+        .limit(50)
+      setLogs(data || [])
+    } catch {
+      setLogs([])
+    } finally {
+      setLoadingLogs(false)
+    }
+  }, [user])
+
+  useEffect(() => { loadLogs() }, [loadLogs])
 
   useEffect(() => { loadAgents() }, [loadAgents])
 
@@ -711,6 +735,52 @@ export default function Agents() {
           </div>
         )}
       </section>
+
+      {/* Histórico de Execuções */}
+      {(logs.length > 0 || loadingLogs) && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <IconHistory size={18} className="text-brand-500" stroke={1.5} />
+            <h2 className="text-base font-semibold text-txt-primary">Histórico de Execuções</h2>
+            <span className="text-xs text-txt-secondary ml-auto">{logs.length} ações recentes</span>
+          </div>
+          <div className="bg-white border border-border rounded-card overflow-hidden">
+            {loadingLogs ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-txt-secondary text-sm">
+                <div className="w-4 h-4 border-2 border-border border-t-brand-500 rounded-full animate-spin" />
+                Carregando histórico…
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {logs.map(log => {
+                  const agentName = userAgents.find(a => a.id === log.agent_id)?.name || 'Agente'
+                  const isPositive = ['increase_budget', 'send_notification'].includes(log.action)
+                  const isDanger   = ['pause_campaign', 'pause_ad', 'decrease_budget'].includes(log.action)
+                  return (
+                    <div key={log.id} className="px-4 py-3 flex items-start gap-3">
+                      <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
+                        isDanger   ? 'bg-status-warning' :
+                        isPositive ? 'bg-status-success' :
+                        'bg-brand-500'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-txt-primary truncate">{log.message}</p>
+                        <p className="text-xs text-txt-secondary mt-0.5">
+                          {agentName}
+                          {log.metric_key && ` · ${log.metric_key.toUpperCase()}: ${Number(log.metric_value || 0).toFixed(2)}`}
+                        </p>
+                      </div>
+                      <span className="text-xs text-txt-secondary shrink-0 whitespace-nowrap">
+                        {formatRelativeTime(log.executed_at)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Templates */}
       <section>

@@ -154,3 +154,57 @@ create policy "Update próprio avatar"
 create policy "Leitura pública de avatars"
   on storage.objects for select
   using (bucket_id = 'avatars');
+
+-- ============================================================
+-- 7. Suporte ao motor de agentes IA
+-- Execute separadamente
+-- ============================================================
+
+-- Coluna para rastrear quando o agente foi executado pela última vez
+alter table agents
+  add column if not exists last_run_at timestamptz;
+
+-- Tabela de histórico de execuções dos agentes
+create table if not exists agent_logs (
+  id            uuid default gen_random_uuid() primary key,
+  agent_id      uuid references agents(id) on delete cascade not null,
+  user_id       uuid references auth.users(id) on delete cascade not null,
+  campaign_id   text,
+  campaign_name text,
+  action        text not null,   -- increase_budget, decrease_budget, pause_campaign, etc.
+  metric_key    text,            -- roas, cpa, ctr, etc.
+  metric_value  numeric,         -- valor da métrica no momento da execução
+  threshold     numeric,         -- valor configurado na regra
+  message       text not null,   -- descrição humana da ação
+  executed_at   timestamptz default now()
+);
+
+alter table agent_logs enable row level security;
+
+create policy "Usuário lê próprios logs"
+  on agent_logs for select
+  using (auth.uid() = user_id);
+
+-- Índices para performance
+create index if not exists agent_logs_agent_id_idx on agent_logs(agent_id);
+create index if not exists agent_logs_user_id_idx  on agent_logs(user_id);
+create index if not exists agent_logs_executed_at_idx on agent_logs(executed_at desc);
+
+-- ============================================================
+-- 8. Notificações broadcast (admin → todos os usuários)
+-- Corrige RLS para permitir leitura de notificações com user_id NULL
+-- ============================================================
+
+drop policy if exists "Usuário gerencia próprias notificações" on notifications;
+
+create policy "Usuário lê próprias notificações e broadcasts"
+  on notifications for select
+  using (auth.uid() = user_id or user_id is null);
+
+create policy "Usuário atualiza próprias notificações"
+  on notifications for update
+  using (auth.uid() = user_id);
+
+create policy "Service role insere notificações"
+  on notifications for insert
+  with check (true);  -- Edge Function usa service role, pode inserir para qualquer user
