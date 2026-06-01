@@ -64,9 +64,9 @@ export function MetaProvider({ children }) {
   // Fluxo redirect OAuth — redireciona para o Facebook e volta com token na URL
   const startConnectRedirect = useCallback(() => {
     const params = new URLSearchParams({
-      client_id:    META_APP_ID,
-      redirect_uri: `${window.location.origin}/conexoes`,
-      scope:        'ads_management,pages_read_engagement',
+      client_id:     META_APP_ID,
+      redirect_uri:  'https://gespub.online/conexoes',
+      scope:         'ads_management,pages_read_engagement',
       response_type: 'token',
     })
     window.location.href = `https://www.facebook.com/dialog/oauth?${params}`
