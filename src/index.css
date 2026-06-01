@@ -1,0 +1,69 @@
+/* Importação da fonte Inter — Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+/* Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Reset e estilos globais */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    color: #18181B;
+    background-color: #F4F4F6;
+    font-size: 14px;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  /* Nunca usar font-weight 700 */
+  strong, b {
+    font-weight: 600;
+  }
+
+  /* Focus ring padrão — única sombra permitida */
+  *:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.3);
+    border-radius: 8px;
+  }
+
+  /* Scrollbar customizada (sutil) */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #DDD6FE;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #7C3AED;
+  }
+}
+
+/* Utilitários personalizados */
+@layer utilities {
+  /* Transição padrão do projeto */
+  .transition-default {
+    transition: all 150ms ease;
+  }
+}

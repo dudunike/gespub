@@ -1,0 +1,236 @@
+{
+  "main": {
+    "id": "6bbc8a6cb84371d9",
+    "type": "split",
+    "children": [
+      {
+        "id": "4afacd0ed1bbb757",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "30a00d5975511f2a",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Bem-vindo.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Bem-vindo"
+            }
+          }
+        ]
+      },
+      {
+        "id": "0c309394828cc28c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "978859808eb327c5",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "🔌 Integracoes/Gemini-API.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Gemini-API"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "492d5bb42688016c",
+    "type": "split",
+    "children": [
+      {
+        "id": "b07e2786060af49b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6251e25c7e269ed3",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "f100a08c87166b7e",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "45ed10806a6f5bf7",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "b5e82894f7f6e11b",
+    "type": "split",
+    "children": [
+      {
+        "id": "22bd16f27bf2f200",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f3f2c7e10072a49e",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "🔌 Integracoes/Gemini-API.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos para Gemini-API"
+            }
+          },
+          {
+            "id": "130294ad03765217",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "🔌 Integracoes/Gemini-API.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída para Gemini-API"
+            }
+          },
+          {
+            "id": "ca8097827bd60ced",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "fae9945e8e4f95dc",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas as propriedades"
+            }
+          },
+          {
+            "id": "60287afce01af922",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "🔌 Integracoes/Gemini-API.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário de Gemini-API"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "978859808eb327c5",
+  "lastOpenFiles": [
+    "🐛 Bugs-e-Problemas/Log-de-Bugs.md",
+    "Bem-vindo.md",
+    "📝 Decisoes/Decisoes-Tecnicas.md",
+    "📝 Decisoes",
+    "🐛 Bugs-e-Problemas",
+    "🛡️ ADIM/Gestao-Usuarios.md",
+    "🛡️ ADIM/Modulos-ADIM.md",
+    "🛡️ ADIM/Visao-Geral-ADIM.md",
+    "🛡️ ADIM",
+    "🔌 Integracoes/Gemini-API.md",
+    "🔌 Integracoes/Meta-Ads.md",
+    "🔌 Integracoes",
+    "🤖 Agentes-IA/Gemini-Integration.md",
+    "🤖 Agentes-IA/Regras.md",
+    "🤖 Agentes-IA/Conceito.md",
+    "🤖 Agentes-IA",
+    "🖥️ Frontend/Status-Frontend.md",
+    "🖥️ Frontend/Design-System.md",
+    "🖥️ Frontend/Paginas.md",
+    "🖥️ Frontend/Componentes.md",
+    "🖥️ Frontend",
+    "📋 Projeto/Roadmap.md",
+    "📋 Projeto/Arquitetura.md",
+    "📋 Projeto/Paleta-de-Cores.md",
+    "📋 Projeto/Visao-Geral.md",
+    "📋 Projeto",
+    "crie um link.md"
+  ]
+}

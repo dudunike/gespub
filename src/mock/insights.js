@@ -1,0 +1,88 @@
+// Dados mockados de insights gerados pela IA
+
+export const mockInsights = [
+  {
+    id: 'ins_001',
+    type: 'opportunity',
+    title: 'Campanha de Remarketing com potencial de escala',
+    analysis: 'A campanha "Remarketing — Carrinho abandonado" apresenta ROAS de 7.0× e CPA de apenas R$ 3,53 — o melhor desempenho entre todas as campanhas ativas. Com orçamento diário de R$ 165, ainda há margem significativa para escalar. Recomendamos aumentar o investimento em 30-40% mantendo os mesmos conjuntos de público.',
+    metrics: [
+      { label: 'ROAS atual', value: '7.0×' },
+      { label: 'CPA', value: 'R$ 3,53' },
+      { label: 'Conversões', value: '892' },
+    ],
+    campaignId: 'cmp_003',
+    campaignName: 'Remarketing — Carrinho abandonado',
+    createdAt: '2025-06-10T10:00:00Z',
+  },
+  {
+    id: 'ins_002',
+    type: 'opportunity',
+    title: 'Lookalike 1% superando público aberto',
+    analysis: 'O conjunto "Lookalike — Compradores 1%" está gerando 40% mais conversões que o público por interesse "Moda e Acessórios" com CPC 50% menor. Sugerimos realocar o orçamento do público por interesse para expandir o lookalike em novos segmentos (2%, 3%).',
+    metrics: [
+      { label: 'CPC Lookalike', value: 'R$ 1,90' },
+      { label: 'CPC Interesse', value: 'R$ 2,40' },
+      { label: 'Conversões Lookalike', value: '468' },
+    ],
+    campaignId: 'cmp_001',
+    campaignName: 'Black Friday 2025 — Conversões',
+    createdAt: '2025-06-10T09:30:00Z',
+  },
+  {
+    id: 'ins_003',
+    type: 'warning',
+    title: 'Fadiga criativa detectada no carrossel principal',
+    analysis: 'O anúncio "Carrossel — Top 5 Produtos" está mostrando sinais claros de fadiga criativa. A frequência atingiu 2.8, o CTR caiu para 2.1% (abaixo da média de 3.2% da campanha) e o CPC subiu 30% nas últimas 48h. Recomendamos criar uma nova variação do criativo ou pausar temporariamente.',
+    metrics: [
+      { label: 'Frequência', value: '2.8' },
+      { label: 'CTR', value: '2.1%' },
+      { label: 'CPC', value: 'R$ 2,40' },
+    ],
+    campaignId: 'cmp_001',
+    campaignName: 'Black Friday 2025 — Conversões',
+    createdAt: '2025-06-10T08:00:00Z',
+  },
+  {
+    id: 'ins_004',
+    type: 'warning',
+    title: 'Campanha de branding com ROAS insuficiente',
+    analysis: 'A campanha "Branding — Reconhecimento de marca" apresenta ROAS de apenas 1.5×, significativamente abaixo do break-even estimado de 2.0×. O CTR de 1.1% indica baixo engajamento com os criativos atuais. Recomendamos revisão completa dos criativos antes de reativar.',
+    metrics: [
+      { label: 'ROAS', value: '1.5×' },
+      { label: 'CTR', value: '1.1%' },
+      { label: 'CPA', value: 'R$ 25,71' },
+    ],
+    campaignId: 'cmp_004',
+    campaignName: 'Branding — Reconhecimento de marca',
+    createdAt: '2025-06-09T16:00:00Z',
+  },
+  {
+    id: 'ins_005',
+    type: 'critical',
+    title: 'CPA crítico em anúncio de branding',
+    analysis: 'O anúncio "Branding — Manifesto da marca" atingiu CPA de R$ 28,40 — mais de 4× acima da média da conta (R$ 6,66). Este anúncio está consumindo orçamento sem retorno significativo. Ação imediata necessária: pausar o anúncio e realocar o orçamento para criativos com melhor performance.',
+    metrics: [
+      { label: 'CPA', value: 'R$ 28,40' },
+      { label: 'CPA médio da conta', value: 'R$ 6,66' },
+      { label: 'Conversões', value: '68' },
+    ],
+    campaignId: 'cmp_004',
+    campaignName: 'Branding — Reconhecimento de marca',
+    createdAt: '2025-06-10T11:00:00Z',
+  },
+  {
+    id: 'ins_006',
+    type: 'critical',
+    title: 'Orçamento da campanha Black Friday próximo do limite',
+    analysis: 'A campanha "Black Friday 2025" já consumiu R$ 8.420 de um orçamento total de R$ 15.000 (56%). No ritmo atual de gasto (R$ 420/dia), o orçamento será esgotado em aproximadamente 16 dias, antes da data planejada de encerramento. Considere aumentar o orçamento total ou reduzir o gasto diário para manter a campanha ativa até o final do período.',
+    metrics: [
+      { label: 'Gasto atual', value: 'R$ 8.420' },
+      { label: 'Orçamento total', value: 'R$ 15.000' },
+      { label: 'Dias restantes estimados', value: '16' },
+    ],
+    campaignId: 'cmp_001',
+    campaignName: 'Black Friday 2025 — Conversões',
+    createdAt: '2025-06-10T07:00:00Z',
+  },
+]

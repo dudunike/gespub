@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#181818"/>
+      <stop offset="100%" style="stop-color:#0a0a0a"/>
+    </linearGradient>
+    <!-- Gradiente metálico prata/chrome -->
+    <linearGradient id="metal" x1="0%" y1="0%" x2="10%" y2="100%">
+      <stop offset="0%"   style="stop-color:#ffffff"/>
+      <stop offset="20%"  style="stop-color:#d0d0d0"/>
+      <stop offset="45%"  style="stop-color:#f8f8f8"/>
+      <stop offset="65%"  style="stop-color:#9a9a9a"/>
+      <stop offset="85%"  style="stop-color:#c8c8c8"/>
+      <stop offset="100%" style="stop-color:#e8e8e8"/>
+    </linearGradient>
+    <!-- Gradiente lateral escuro para efeito 3D -->
+    <linearGradient id="metalSide" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   style="stop-color:#555"/>
+      <stop offset="100%" style="stop-color:#333"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="5" dy="8" stdDeviation="10" flood-color="#000" flood-opacity="0.7"/>
+    </filter>
+  </defs>
+
+  <!-- Fundo arredondado escuro -->
+  <rect width="512" height="512" rx="90" fill="url(#bg)"/>
+  <!-- Borda sutil -->
+  <rect width="512" height="512" rx="90" fill="none" stroke="#2d2d2d" stroke-width="3"/>
+
+  <g filter="url(#shadow)">
+    <!-- ══════ LETRA G ══════ -->
+    <!-- Corpo externo do G: arco C -->
+    <path d="
+      M 60 248
+      C 60 140 140 60 248 60
+      C 316 60 375 92 412 144
+      L 368 174
+      C 342 136 298 112 248 112
+      C 170 112 112 172 112 248
+      C 112 324 170 384 248 384
+      C 296 384 336 362 360 326
+      L 360 272
+      L 258 272
+      L 258 224
+      L 414 224
+      L 414 344
+      C 380 414 320 436 248 436
+      C 140 436 60 356 60 248 Z
+    " fill="url(#metal)"/>
+    <!-- Faceta baixo do G para profundidade -->
+    <path d="M 112 248 C 112 324 170 384 248 384 L 248 436 C 140 436 60 356 60 248 Z"
+          fill="url(#metalSide)" opacity="0.5"/>
+
+    <!-- ══════ LETRA P ══════ -->
+    <!-- Haste vertical do P -->
+    <rect x="272" y="60" width="60" height="380" rx="8" fill="url(#metal)"/>
+    <!-- Faceta lateral da haste -->
+    <rect x="272" y="60" width="14" height="380" rx="8" fill="url(#metalSide)" opacity="0.4"/>
+
+    <!-- Arco do P -->
+    <path d="
+      M 272 60 L 376 60
+      C 444 60 490 104 490 178
+      C 490 252 444 296 376 296
+      L 272 296 Z
+    " fill="url(#metal)"/>
+    <!-- Furo interno do P -->
+    <path d="
+      M 332 118 L 372 118
+      C 408 118 428 144 428 178
+      C 428 212 408 238 372 238
+      L 332 238 Z
+    " fill="url(#bg)"/>
+    <!-- Faceta superior do arco P -->
+    <path d="M 272 60 L 376 60 C 444 60 490 104 490 178 L 476 178 C 476 112 432 74 376 74 L 272 74 Z"
+          fill="#ffffff" opacity="0.12"/>
+  </g>
+</svg>
