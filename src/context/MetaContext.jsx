@@ -1,7 +1,7 @@
 // Contexto de conexão Meta Ads — gerencia token, conta e estado de conexão
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { fbLogin, fbLogout } from '../lib/metaSDK'
+import { fbLogin, fbLogout, META_APP_ID } from '../lib/metaSDK'
 import { getAdAccounts, checkTokenValid } from '../lib/metaApi'
 import { useAuth } from './AuthContext'
 
@@ -64,7 +64,7 @@ export function MetaProvider({ children }) {
   // Fluxo redirect OAuth — redireciona para o Facebook e volta com token na URL
   const startConnectRedirect = useCallback(() => {
     const params = new URLSearchParams({
-      client_id:    import.meta.env.VITE_META_APP_ID || '2456845514766257',
+      client_id:    META_APP_ID,
       redirect_uri: `${window.location.origin}/conexoes`,
       scope:        'ads_management,pages_read_engagement',
       response_type: 'token',
