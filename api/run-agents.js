@@ -301,16 +301,17 @@ async function processAgent(agent, conn, supabase) {
 // ─── Handler principal ────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
-  // Só aceita GET e POST
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // Autenticação via header secret
-  const cronSecret = process.env.CRON_SECRET
-  const incoming   = req.headers['x-cron-secret']
-  if (!cronSecret || incoming !== cronSecret) {
-    return res.status(401).json({ error: 'Unauthorized — x-cron-secret inválido' })
+  const cronSecret  = process.env.CRON_SECRET || 'gespub-cron-2026'
+  const fromVercel  = req.headers['x-vercel-cron'] === '1'                  // Vercel Cron nativo
+  const fromExternal = req.headers['x-cron-secret'] === cronSecret          // pg_cron / externo
+  const fromQuery   = req.query?.secret === cronSecret                       // query param fallback
+
+  if (!fromVercel && !fromExternal && !fromQuery) {
+    return res.status(401).json({ error: 'Unauthorized' })
   }
 
   const supabase = createClient(
@@ -318,11 +319,16 @@ export default async function handler(req, res) {
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
+  // Se agentId vier como query param, executa só aquele agente
+  const specificAgentId = req.query?.agentId || req.body?.agentId || null
+
   try {
-    // Busca agentes ativos e conexões Meta
+    let agentsQuery = supabase.from('agents').select('*').eq('is_active', true)
+    if (specificAgentId) agentsQuery = agentsQuery.eq('id', specificAgentId)
+
     const [{ data: agents, error: agentsErr }, { data: connections, error: connErr }] =
       await Promise.all([
-        supabase.from('agents').select('*').eq('is_active', true),
+        agentsQuery,
         supabase.from('meta_connections').select('user_id, access_token, account_id'),
       ])
 

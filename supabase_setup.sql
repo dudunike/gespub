@@ -160,9 +160,10 @@ create policy "Leitura pública de avatars"
 -- Execute separadamente
 -- ============================================================
 
--- Coluna para rastrear quando o agente foi executado pela última vez
+-- Colunas para execução automática
 alter table agents
-  add column if not exists last_run_at timestamptz;
+  add column if not exists last_run_at  timestamptz,
+  add column if not exists cronjob_id   text;  -- ID do job no cron-job.org
 
 -- Tabela de histórico de execuções dos agentes
 create table if not exists agent_logs (

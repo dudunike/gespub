@@ -605,9 +605,29 @@ export default function Agents() {
     setModalOpen(true)
   }
 
+  // Chama a API de gerenciamento de cron jobs
+  const manageCron = async (action, agentId, agentName, frequency, enabled) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      await fetch('/api/manage-agent-cron', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action, agentId, agentName, frequency, enabled }),
+      })
+    } catch {
+      // Cron é best-effort — não bloqueia operação principal
+    }
+  }
+
   const handleToggle = async (agentId, val) => {
     setUserAgents(prev => prev.map(a => a.id === agentId ? { ...a, is_active: val } : a))
     await supabase.from('agents').update({ is_active: val }).eq('id', agentId)
+    const agent = userAgents.find(a => a.id === agentId)
+    manageCron('toggle', agentId, agent?.name, agent?.frequency, val)
   }
 
   const handleSave = async (form, agentId) => {
@@ -629,15 +649,19 @@ export default function Agents() {
       const { error } = await supabase.from('agents').update(payload).eq('id', agentId)
       if (error) throw new Error(error.message)
       setUserAgents(prev => prev.map(a => a.id === agentId ? { ...a, ...payload } : a))
+      manageCron('update', agentId, form.name, form.frequency, true)
     } else {
       const { data, error } = await supabase.from('agents').insert([payload]).select().single()
       if (error) throw new Error(error.message)
       setUserAgents(prev => [data, ...prev])
+      manageCron('create', data.id, form.name, form.frequency, true)
     }
   }
 
   const handleDelete = async (agentId) => {
     setDeleting(agentId)
+    const agent = userAgents.find(a => a.id === agentId)
+    manageCron('delete', agentId, agent?.name, agent?.frequency, false)
     await supabase.from('agents').delete().eq('id', agentId)
     setUserAgents(prev => prev.filter(a => a.id !== agentId))
     setDeleting(null)
