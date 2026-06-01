@@ -11,6 +11,8 @@ import AdminLayout from './components/admin/AdminLayout'
 
 // Páginas
 import Login from './pages/Login'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfUse from './pages/TermsOfUse'
 import Dashboard from './pages/platform/Dashboard'
 import Campaigns from './pages/platform/Campaigns'
 import AdSets from './pages/platform/AdSets'
@@ -64,6 +66,10 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+
+      {/* Páginas públicas (sem autenticação) */}
+      <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+      <Route path="/termos-de-uso" element={<TermsOfUse />} />
 
       {/* Plataforma — rotas protegidas */}
       <Route

@@ -1,7 +1,5 @@
-// Tela de Login — acesso apenas por convite via Admin
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { IconBrandFacebook } from '@tabler/icons-react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
@@ -20,47 +18,28 @@ export default function Login() {
     e.preventDefault()
     setError('')
     setInfo('')
-
-    if (!email || !password) {
-      setError('Preencha todos os campos.')
-      return
-    }
-
+    if (!email || !password) { setError('Preencha todos os campos.'); return }
     setLoading(true)
     const result = await login(email, password)
     setLoading(false)
-
-    if (result.success) {
-      navigate('/dashboard')
-    } else {
-      setError(result.error)
-    }
+    if (result.success) navigate('/dashboard')
+    else setError(result.error)
   }
 
   const handleResetPassword = async (e) => {
     e.preventDefault()
     setError('')
     setInfo('')
-
-    if (!email) {
-      setError('Informe seu e-mail para redefinir a senha.')
-      return
-    }
-
+    if (!email) { setError('Informe seu e-mail para redefinir a senha.'); return }
     setLoading(true)
     const result = await resetPassword(email)
     setLoading(false)
-
     if (result.success) {
       setInfo('E-mail de redefinição enviado. Verifique sua caixa de entrada.')
       setShowReset(false)
     } else {
       setError(result.error)
     }
-  }
-
-  const handleFacebookLogin = () => {
-    setError('Login com Facebook ainda não configurado. Use e-mail e senha.')
   }
 
   return (
@@ -73,116 +52,119 @@ export default function Login() {
         </span>
       </div>
 
-      <p className="text-sm text-txt-secondary mb-8">
-        Gestão inteligente de anúncios
-      </p>
+      <p className="text-sm text-txt-secondary mb-8">Gestão inteligente de anúncios</p>
 
       <div className="w-full max-w-sm bg-white border border-border rounded-card p-8">
         {!showReset ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="px-3 py-2 text-sm text-status-error bg-status-errorBg rounded-input">
-                {error}
-              </div>
-            )}
-            {info && (
-              <div className="px-3 py-2 text-sm text-status-success bg-status-successBg rounded-input">
-                {info}
-              </div>
-            )}
-
-            <Input
-              label="E-mail"
-              type="email"
-              name="email"
-              placeholder="seu@email.com.br"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <Input
-              label="Senha"
-              type="password"
-              name="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-
-            <Button type="submit" fullWidth disabled={loading}>
-              {loading ? 'Entrando...' : 'Entrar'}
-            </Button>
-          </form>
-        ) : (
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <p className="text-sm text-txt-secondary">
-              Informe seu e-mail e enviaremos um link para redefinir a senha.
-            </p>
-            {error && (
-              <div className="px-3 py-2 text-sm text-status-error bg-status-errorBg rounded-input">
-                {error}
-              </div>
-            )}
-
-            <Input
-              label="E-mail"
-              type="email"
-              name="email"
-              placeholder="seu@email.com.br"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <Button type="submit" fullWidth disabled={loading}>
-              {loading ? 'Enviando...' : 'Enviar link de redefinição'}
-            </Button>
-
-            <button
-              type="button"
-              onClick={() => { setShowReset(false); setError('') }}
-              className="w-full text-sm text-txt-secondary hover:text-txt-primary transition-all duration-150 text-center"
-            >
-              Voltar ao login
-            </button>
-          </form>
-        )}
-
-        {!showReset && (
           <>
-            <div className="flex items-center gap-3 my-5">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-txt-secondary">ou</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
+            <h1 className="text-base font-semibold text-txt-primary mb-5">Entrar na plataforma</h1>
 
-            <Button
-              variant="facebook"
-              fullWidth
-              onClick={handleFacebookLogin}
-              icon={IconBrandFacebook}
-            >
-              Continuar com Facebook
-            </Button>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="px-3 py-2 text-sm text-status-error bg-status-errorBg rounded-input">
+                  {error}
+                </div>
+              )}
+              {info && (
+                <div className="px-3 py-2 text-sm text-status-success bg-status-successBg rounded-input">
+                  {info}
+                </div>
+              )}
 
-            <div className="mt-5 text-center">
+              <Input
+                label="E-mail"
+                type="email"
+                name="email"
+                autoComplete="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+
+              <Input
+                label="Senha"
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+
+              <Button type="submit" fullWidth disabled={loading}>
+                {loading ? 'Entrando…' : 'Entrar'}
+              </Button>
+            </form>
+
+            <div className="mt-4 text-center">
               <button
                 type="button"
                 onClick={() => { setShowReset(true); setError(''); setInfo('') }}
-                className="text-sm text-brand-500 hover:text-brand-700 transition-all duration-150"
+                className="text-sm text-brand-500 hover:text-brand-700 transition-colors"
               >
                 Esqueci minha senha
               </button>
             </div>
+
+            <p className="mt-6 text-center text-xs text-txt-secondary">
+              Acesso restrito por convite
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-base font-semibold text-txt-primary mb-1">Redefinir senha</h1>
+            <p className="text-sm text-txt-secondary mb-5">
+              Informe seu e-mail e enviaremos um link de redefinição.
+            </p>
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              {error && (
+                <div className="px-3 py-2 text-sm text-status-error bg-status-errorBg rounded-input">
+                  {error}
+                </div>
+              )}
+
+              <Input
+                label="E-mail"
+                type="email"
+                name="email"
+                autoComplete="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+
+              <Button type="submit" fullWidth disabled={loading}>
+                {loading ? 'Enviando…' : 'Enviar link de redefinição'}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => { setShowReset(false); setError('') }}
+                className="w-full text-sm text-txt-secondary hover:text-txt-primary transition-colors text-center"
+              >
+                Voltar ao login
+              </button>
+            </form>
           </>
         )}
       </div>
 
-      <p className="mt-8 text-xs text-txt-secondary">
-        © 2025 GESPUB.AI
-      </p>
+      {/* Links de política */}
+      <div className="mt-6 flex items-center gap-4 text-xs text-txt-secondary">
+        <Link to="/politica-de-privacidade" className="hover:text-brand-500 transition-colors">
+          Política de Privacidade
+        </Link>
+        <span>·</span>
+        <Link to="/termos-de-uso" className="hover:text-brand-500 transition-colors">
+          Termos de Uso
+        </Link>
+      </div>
+
+      <p className="mt-3 text-xs text-txt-secondary">© {new Date().getFullYear()} GesPub.ai</p>
     </div>
   )
 }

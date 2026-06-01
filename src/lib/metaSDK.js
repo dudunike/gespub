@@ -13,8 +13,6 @@ export function loadFBSDK() {
   if (_sdkPromise) return _sdkPromise
 
   _sdkPromise = new Promise((resolve, reject) => {
-    const appId = META_APP_ID
-
     // SDK já carregado
     if (window.FB && window._fbSDKReady) {
       resolve(window.FB)
