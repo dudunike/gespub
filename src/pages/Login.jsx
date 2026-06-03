@@ -15,7 +15,7 @@ export default function Login() {
   const [info, setInfo]           = useState('')
   const [loading, setLoading]     = useState(false)
 
-  // Navega assim que isAuthenticated vira true — garante timing correto
+  // Redireciona se já estiver autenticado (ex: voltou para a página de login)
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true })
   }, [isAuthenticated, navigate])
@@ -25,12 +25,24 @@ export default function Login() {
     setError(''); setInfo('')
     if (!email || !password) { setError('Preencha todos os campos.'); return }
     setLoading(true)
-    const result = await login(email, password)
-    if (!result.success) {
+    const timeoutId = setTimeout(() => {
       setLoading(false)
-      setError(result.error)
+      setError('Tempo limite atingido. Verifique sua conexão e tente novamente.')
+    }, 15000)
+    try {
+      const result = await login(email, password)
+      clearTimeout(timeoutId)
+      if (result.success) {
+        navigate('/dashboard', { replace: true })
+      } else {
+        setError(result.error || 'Erro ao entrar. Tente novamente.')
+      }
+    } catch {
+      clearTimeout(timeoutId)
+      setError('Erro ao conectar com o servidor. Tente novamente.')
+    } finally {
+      setLoading(false)
     }
-    // Se success: mantém loading até o useEffect redirecionar
   }
 
   const handleReset = async (e) => {

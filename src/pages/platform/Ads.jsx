@@ -5,7 +5,7 @@ import {
   IconList, IconLayoutGrid, IconPlayerPlay,
   IconPlugConnected, IconRefresh, IconAlertCircle,
   IconExternalLink, IconPlayerPause, IconPhoto,
-  IconChevronDown, IconSearch,
+  IconChevronDown, IconSearch, IconHeart, IconUserPlus,
 } from '@tabler/icons-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -181,6 +181,9 @@ export default function Ads() {
     const conversions  = getActionCount(ins.actions, 'purchase')
                        + getActionCount(ins.actions, 'lead')
                        + getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
+    const reactions    = getActionCount(ins.actions, 'post_reaction')
+    const pageLikes    = getActionCount(ins.actions, 'like')
+    const comments     = getActionCount(ins.actions, 'comment')
 
     const campaignId = ad.campaign_id || ad.campaign?.id || ''
     const adSetId    = ad.adset_id    || ad.adset?.id    || ''
@@ -199,6 +202,7 @@ export default function Ads() {
       campaignName: ad.campaign?.name || campaignMap[campaignId] || campaignId || '—',
       adSetName:    ad.adset?.name    || adSetMap[adSetId]       || adSetId    || '—',
       spend, impressions, clicks, ctr, cpc, frequency, reach, conversions,
+      reactions, pageLikes, comments,
     }
   }
 
@@ -444,6 +448,20 @@ export default function Ads() {
                         {ad.frequency > 0 ? `${ad.frequency.toFixed(1)}×` : '—'}
                       </p>
                     </div>
+                    <div className="flex items-start gap-1">
+                      <IconHeart size={11} className="text-rose-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-txt-secondary">Curtidas</p>
+                        <p className="font-semibold text-txt-primary">{ad.reactions > 0 ? formatNumber(ad.reactions) : '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-1">
+                      <IconUserPlus size={11} className="text-emerald-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-txt-secondary">Seguidores</p>
+                        <p className="font-semibold text-txt-primary">{ad.pageLikes > 0 ? formatNumber(ad.pageLikes) : '—'}</p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Rodapé: status + ações */}
@@ -475,7 +493,7 @@ export default function Ads() {
           <table className="w-full min-w-[1000px]">
             <thead>
               <tr className="border-b border-border bg-surface-bg">
-                {['Anúncio', 'Campanha / Conjunto', 'Tipo', 'Investido', 'Impressões', 'CTR', 'CPC', 'Frequência', 'Conversões', 'Status', ''].map((h) => (
+                {['Anúncio', 'Campanha / Conjunto', 'Tipo', 'Investido', 'Impressões', 'CTR', 'CPC', 'Frequência', 'Curtidas', 'Seguidores', 'Conversões', 'Status', ''].map((h) => (
                   <th key={h} className="text-left text-xs font-medium text-txt-secondary px-3 py-3 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -520,6 +538,18 @@ export default function Ads() {
                     <td className="px-3 py-3 text-sm whitespace-nowrap">
                       <span className={ad.frequency > 3 ? 'text-status-warning font-medium' : 'text-txt-primary'}>
                         {ad.frequency > 0 ? `${ad.frequency.toFixed(1)}×` : '—'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-sm whitespace-nowrap">
+                      <span className="flex items-center gap-1">
+                        {ad.reactions > 0 && <IconHeart size={12} className="text-rose-400" />}
+                        <span className="text-txt-primary">{ad.reactions > 0 ? formatNumber(ad.reactions) : '—'}</span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-sm whitespace-nowrap">
+                      <span className="flex items-center gap-1">
+                        {ad.pageLikes > 0 && <IconUserPlus size={12} className="text-emerald-500" />}
+                        <span className="text-txt-primary">{ad.pageLikes > 0 ? formatNumber(ad.pageLikes) : '—'}</span>
                       </span>
                     </td>
                     <td className="px-3 py-3 text-sm text-txt-primary whitespace-nowrap">
