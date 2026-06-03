@@ -28,7 +28,7 @@ export default function Login() {
     const timeoutId = setTimeout(() => {
       setLoading(false)
       setError('Tempo limite atingido. Verifique sua conexão e tente novamente.')
-    }, 15000)
+    }, 12000)
     try {
       const result = await login(email, password)
       clearTimeout(timeoutId)

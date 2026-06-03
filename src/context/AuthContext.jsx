@@ -109,10 +109,15 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // Login com Supabase Auth
+  // Login com Supabase Auth — Promise.race garante timeout de 10s
   const login = useCallback(async (email, password) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const authPromise = supabase.auth.signInWithPassword({ email, password })
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Sem resposta do servidor. Verifique sua conexão e tente novamente.')), 10000)
+      )
+
+      const { data, error } = await Promise.race([authPromise, timeoutPromise])
 
       if (error) {
         if (error.code === 'invalid_credentials' || error.status === 400) {
@@ -124,8 +129,6 @@ export function AuthProvider({ children }) {
         return { success: false, error: error.message }
       }
 
-      // Define usuário básico imediatamente para navegação instantânea.
-      // onAuthStateChange buscará o perfil completo em background.
       const basicUser = buildProfileFromSession(data.user)
       setUser(basicUser)
       setIsAuthenticated(true)
