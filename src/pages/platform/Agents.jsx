@@ -510,27 +510,33 @@ export default function Agents() {
 
   const [userAgents,    setUserAgents]    = useState([])
   const [campaigns,     setCampaigns]     = useState([])
-  const [loadingAgents, setLoadingAgents] = useState(true)
+  const [loadingAgents, setLoadingAgents] = useState(false)
   const [modalOpen,     setModalOpen]     = useState(false)
   const [editingAgent,  setEditingAgent]  = useState(null)
   const [initialForm,   setInitialForm]   = useState(null)
   const [deleting,      setDeleting]      = useState(null)
   const [logs,          setLogs]          = useState([])
   const [loadingLogs,   setLoadingLogs]   = useState(false)
+  const [logsLoaded,    setLogsLoaded]    = useState(false)
+
+  // Timeout helper para queries Supabase que podem travar
+  const withQueryTimeout = (promise, ms = 8000) =>
+    Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+    ])
 
   // Carregar agentes do Supabase
   const loadAgents = useCallback(async () => {
-    if (!user) return
+    if (!user) { setLoadingAgents(false); return }
     setLoadingAgents(true)
     try {
-      const { data, error } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      const { data, error } = await withQueryTimeout(
+        supabase.from('agents').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+      )
       if (!error) setUserAgents(data || [])
-    } catch (e) {
-      console.warn('Erro ao carregar agentes:', e)
+    } catch {
+      setUserAgents([])
     } finally {
       setLoadingAgents(false)
     }
@@ -538,20 +544,18 @@ export default function Agents() {
 
   // Carregar logs de execução
   const loadLogs = useCallback(async () => {
-    if (!user) return
+    if (!user) { setLoadingLogs(false); return }
     setLoadingLogs(true)
     try {
-      const { data } = await supabase
-        .from('agent_logs')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('executed_at', { ascending: false })
-        .limit(50)
+      const { data } = await withQueryTimeout(
+        supabase.from('agent_logs').select('*').eq('user_id', user.id).order('executed_at', { ascending: false }).limit(50)
+      )
       setLogs(data || [])
     } catch {
       setLogs([])
     } finally {
       setLoadingLogs(false)
+      setLogsLoaded(true)
     }
   }, [user])
 
@@ -761,12 +765,12 @@ export default function Agents() {
       </section>
 
       {/* Histórico de Execuções */}
-      {(logs.length > 0 || loadingLogs) && (
+      {(logsLoaded || loadingLogs) && (logs.length > 0 || loadingLogs) && (
         <section>
           <div className="flex items-center gap-2 mb-3">
             <IconHistory size={18} className="text-brand-500" stroke={1.5} />
             <h2 className="text-base font-semibold text-txt-primary">Histórico de Execuções</h2>
-            <span className="text-xs text-txt-secondary ml-auto">{logs.length} ações recentes</span>
+            <span className="text-xs text-txt-secondary ml-auto">{loadingLogs ? '…' : `${logs.length} ações recentes`}</span>
           </div>
           <div className="bg-white border border-border rounded-card overflow-hidden">
             {loadingLogs ? (

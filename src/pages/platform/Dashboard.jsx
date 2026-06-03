@@ -283,38 +283,68 @@ export default function Dashboard() {
       {/* ── Engajamento Social (linha 3) ── */}
       <div className="bg-white border border-border rounded-card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <IconHeart size={16} className="text-rose-500" strokeWidth={1.5} />
+          <IconHeart size={16} className="text-status-error" strokeWidth={1.5} />
           <h2 className="text-sm font-semibold text-txt-primary">Engajamento Social</h2>
           <span className="text-xs text-txt-secondary ml-1">via anúncios</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: 'Curtidas / Reações', value: totalReactions, icon: IconHeart,       color: 'text-rose-500',    bg: 'bg-rose-50',    tip: 'Reações nos posts patrocinados' },
-            { label: 'Seguidores ganhos',  value: totalPageLikes, icon: IconUserPlus,    color: 'text-emerald-600', bg: 'bg-emerald-50', tip: 'Curtidas na página via anúncios' },
-            { label: 'Comentários',        value: totalComments,  icon: IconMessageCircle,color:'text-blue-500',    bg: 'bg-blue-50',    tip: 'Comentários nos anúncios' },
-            { label: 'Compartilhamentos',  value: totalShares,    icon: IconShare2,      color: 'text-violet-500',  bg: 'bg-violet-50',  tip: 'Compartilhamentos dos anúncios' },
-          ].map(({ label, value, icon: Icon, color, bg, tip }) => (
-            <div key={label} className="flex items-start gap-3">
-              <div className={`w-9 h-9 ${bg} rounded-full flex items-center justify-center shrink-0`}>
-                <Icon size={16} className={color} strokeWidth={1.5} />
-              </div>
-              <div>
-                <p className="text-xs text-txt-secondary">{label}</p>
-                {loading ? (
-                  <div className="mt-1 h-6 w-12 bg-surface-bg rounded animate-pulse" />
-                ) : (
-                  <p className="text-xl font-bold text-txt-primary">
-                    {hasInsights ? formatNumber(value) : '—'}
-                  </p>
-                )}
-                <p className="text-[10px] text-txt-secondary mt-0.5 leading-tight">{tip}</p>
-              </div>
+
+          {/* Curtidas */}
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 bg-status-errorBg rounded-full flex items-center justify-center shrink-0">
+              <IconHeart size={16} className="text-status-error" strokeWidth={1.5} />
             </div>
-          ))}
+            <div>
+              <p className="text-xs text-txt-secondary">Curtidas / Reações</p>
+              {loading ? <div className="mt-1 h-6 w-12 bg-surface-bg rounded animate-pulse" />
+                : <p className="text-xl font-bold text-txt-primary">{hasInsights ? formatNumber(totalReactions) : '—'}</p>}
+              <p className="text-[10px] text-txt-secondary mt-0.5 leading-tight">Reações nos posts patrocinados</p>
+            </div>
+          </div>
+
+          {/* Seguidores */}
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 bg-status-successBg rounded-full flex items-center justify-center shrink-0">
+              <IconUserPlus size={16} className="text-status-success" strokeWidth={1.5} />
+            </div>
+            <div>
+              <p className="text-xs text-txt-secondary">Seguidores ganhos</p>
+              {loading ? <div className="mt-1 h-6 w-12 bg-surface-bg rounded animate-pulse" />
+                : <p className="text-xl font-bold text-txt-primary">{hasInsights ? formatNumber(totalPageLikes) : '—'}</p>}
+              <p className="text-[10px] text-txt-secondary mt-0.5 leading-tight">Curtidas na página via anúncios</p>
+            </div>
+          </div>
+
+          {/* Comentários */}
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 bg-brand-50 rounded-full flex items-center justify-center shrink-0">
+              <IconMessageCircle size={16} className="text-brand-500" strokeWidth={1.5} />
+            </div>
+            <div>
+              <p className="text-xs text-txt-secondary">Comentários</p>
+              {loading ? <div className="mt-1 h-6 w-12 bg-surface-bg rounded animate-pulse" />
+                : <p className="text-xl font-bold text-txt-primary">{hasInsights ? formatNumber(totalComments) : '—'}</p>}
+              <p className="text-[10px] text-txt-secondary mt-0.5 leading-tight">Comentários nos anúncios</p>
+            </div>
+          </div>
+
+          {/* Compartilhamentos */}
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 bg-status-warningBg rounded-full flex items-center justify-center shrink-0">
+              <IconShare2 size={16} className="text-status-warning" strokeWidth={1.5} />
+            </div>
+            <div>
+              <p className="text-xs text-txt-secondary">Compartilhamentos</p>
+              {loading ? <div className="mt-1 h-6 w-12 bg-surface-bg rounded animate-pulse" />
+                : <p className="text-xl font-bold text-txt-primary">{hasInsights ? formatNumber(totalShares) : '—'}</p>}
+              <p className="text-[10px] text-txt-secondary mt-0.5 leading-tight">Compartilhamentos dos anúncios</p>
+            </div>
+          </div>
+
         </div>
         {hasInsights && !loading && (totalReactions + totalPageLikes + totalComments + totalShares) === 0 && (
           <p className="mt-3 text-xs text-txt-secondary border-t border-border pt-3">
-            Nenhum engajamento social registrado no período — comum em campanhas de tráfego/conversão sem interações nas publicações.
+            Nenhum engajamento registrado no período — normal para campanhas de tráfego ou conversão que não monitoram interações no post.
           </p>
         )}
       </div>
