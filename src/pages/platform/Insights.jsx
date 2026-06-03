@@ -113,6 +113,7 @@ export default function Insights() {
   const { isConnected, accessToken, accountId, accountName, loadingConnection } = useMeta()
 
   const [insights,       setInsights]       = useState([])
+  const [campaignData,   setCampaignData]   = useState([])
   const [dismissed,      setDismissed]      = useState(new Set())
   const [applied,        setApplied]        = useState(new Set())
   const [loading,        setLoading]        = useState(false)
@@ -139,7 +140,8 @@ export default function Insights() {
     setLoading(true); setError(null)
     try {
       const data = await getCampaignInsights(accountId, accessToken, datePreset)
-      if (!data.length) { setInsights([]); return }
+      if (!data.length) { setInsights([]); setCampaignData([]); return }
+      setCampaignData(data)
 
       // Tenta Gemini primeiro; fallback para algoritmo local
       let generated = []
@@ -369,6 +371,147 @@ export default function Insights() {
           )
         })}
       </div>
+
+      {/* ── Tabela de performance por campanha ── */}
+      {campaignData.length > 0 && !loading && (
+        <div className="bg-white border border-border rounded-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-border">
+            <h2 className="text-sm font-semibold text-txt-primary">Performance por campanha</h2>
+            <p className="text-xs text-txt-secondary mt-0.5">
+              {DATE_PRESETS.find(d => d.id === datePreset)?.label} · {campaignData.length} campanha{campaignData.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px]">
+              <thead>
+                <tr className="bg-surface-bg border-b border-border">
+                  {['Campanha', 'Investido', 'Impressões', 'Alcance', 'CTR', 'CPC', 'CPM', 'Conversões', 'CPA', 'ROAS'].map(h => (
+                    <th key={h} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {campaignData
+                  .filter(c => Number(c.spend || 0) > 0)
+                  .sort((a, b) => Number(b.spend) - Number(a.spend))
+                  .map((c) => {
+                    const spend       = Number(c.spend || 0)
+                    const impressions = Number(c.impressions || 0)
+                    const clicks      = Number(c.clicks || 0)
+                    const reach       = Number(c.reach || 0)
+                    const ctr         = Number(c.ctr || 0)
+                    const cpc         = Number(c.cpc || 0)
+                    const cpm         = Number(c.cpm || 0)
+                    const purchases   = getActionCount(c.actions, 'purchase')
+                    const whatsapp    = getActionCount(c.actions, 'onsite_conversion.messaging_conversation_started_7d')
+                    const leads       = getActionCount(c.actions, 'lead') + getActionCount(c.actions, 'offsite_conversion.fb_pixel_lead')
+                    const convs       = purchases + whatsapp + leads
+                    const revenue     = getActionValue(c.action_values, 'purchase')
+                    const cpa         = spend > 0 && convs > 0 ? spend / convs : 0
+                    const roas        = spend > 0 && revenue > 0 ? revenue / spend : 0
+                    return (
+                      <tr key={c.campaign_id} className="border-b border-border last:border-0 hover:bg-surface-bg/50 transition-colors">
+                        <td className="px-4 py-3 max-w-[220px]">
+                          <p className="text-sm font-medium text-txt-primary truncate" title={c.campaign_name}>{c.campaign_name}</p>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{formatCurrency(spend)}</td>
+                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{formatNumber(impressions)}</td>
+                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{formatNumber(reach)}</td>
+                        <td className="px-4 py-3 text-sm whitespace-nowrap">
+                          <span className={ctr > 3 ? 'text-status-success font-medium' : 'text-txt-primary'}>
+                            {ctr > 0 ? formatPercent(ctr) : '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{cpc > 0 ? formatCurrency(cpc) : '—'}</td>
+                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{cpm > 0 ? formatCurrency(cpm) : '—'}</td>
+                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
+                          {convs > 0 ? (
+                            <div>
+                              <span className="font-medium">{formatNumber(convs)}</span>
+                              <p className="text-[10px] text-txt-secondary leading-tight">
+                                {[purchases > 0 && `${purchases} compra${purchases !== 1 ? 's' : ''}`,
+                                  whatsapp  > 0 && `${whatsapp} WhatsApp`,
+                                  leads     > 0 && `${leads} lead${leads !== 1 ? 's' : ''}`
+                                ].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm whitespace-nowrap">
+                          {cpa > 0 ? (
+                            <span className={`font-semibold ${cpa > 50 ? 'text-status-error' : cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
+                              {formatCurrency(cpa)}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm whitespace-nowrap">
+                          {roas > 0 ? (
+                            <span className={`font-semibold ${roas >= 3 ? 'text-status-success' : roas >= 2 ? 'text-txt-primary' : 'text-status-error'}`}>
+                              {formatRoas(roas)}
+                            </span>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+              {/* Linha de totais */}
+              <tfoot>
+                {(() => {
+                  const active = campaignData.filter(c => Number(c.spend || 0) > 0)
+                  const totSpend  = active.reduce((s, c) => s + Number(c.spend || 0), 0)
+                  const totImp    = active.reduce((s, c) => s + Number(c.impressions || 0), 0)
+                  const totReach  = active.reduce((s, c) => s + Number(c.reach || 0), 0)
+                  const totClicks = active.reduce((s, c) => s + Number(c.clicks || 0), 0)
+                  const totCtr    = totImp > 0 ? (totClicks / totImp) * 100 : 0
+                  const totCpc    = totClicks > 0 ? totSpend / totClicks : 0
+                  const totCpm    = totImp > 0 ? (totSpend / totImp) * 1000 : 0
+                  const totConvs  = active.reduce((s, c) => {
+                    return s
+                      + getActionCount(c.actions, 'purchase')
+                      + getActionCount(c.actions, 'onsite_conversion.messaging_conversation_started_7d')
+                      + getActionCount(c.actions, 'lead')
+                      + getActionCount(c.actions, 'offsite_conversion.fb_pixel_lead')
+                  }, 0)
+                  const totRev    = active.reduce((s, c) => s + getActionValue(c.action_values, 'purchase'), 0)
+                  const totCpa    = totSpend > 0 && totConvs > 0 ? totSpend / totConvs : 0
+                  const totRoas   = totSpend > 0 && totRev > 0 ? totRev / totSpend : 0
+                  return (
+                    <tr className="bg-surface-bg border-t-2 border-brand-200">
+                      <td className="px-4 py-3 text-xs font-semibold text-txt-secondary uppercase tracking-wide">Total</td>
+                      <td className="px-4 py-3 text-sm font-bold text-txt-primary whitespace-nowrap">{formatCurrency(totSpend)}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{formatNumber(totImp)}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{formatNumber(totReach)}</td>
+                      <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap">
+                        <span className={totCtr > 3 ? 'text-status-success' : 'text-txt-primary'}>
+                          {totCtr > 0 ? formatPercent(totCtr) : '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{totCpc > 0 ? formatCurrency(totCpc) : '—'}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{totCpm > 0 ? formatCurrency(totCpm) : '—'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-txt-primary whitespace-nowrap">{totConvs > 0 ? formatNumber(totConvs) : '—'}</td>
+                      <td className="px-4 py-3 text-sm font-bold whitespace-nowrap">
+                        {totCpa > 0 ? (
+                          <span className={totCpa > 50 ? 'text-status-error' : totCpa > 20 ? 'text-status-warning' : 'text-status-success'}>
+                            {formatCurrency(totCpa)}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-bold whitespace-nowrap">
+                        {totRoas > 0 ? (
+                          <span className={totRoas >= 3 ? 'text-status-success' : totRoas >= 2 ? 'text-txt-primary' : 'text-status-error'}>
+                            {formatRoas(totRoas)}
+                          </span>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })()}
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

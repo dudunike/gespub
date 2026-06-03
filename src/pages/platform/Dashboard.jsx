@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { IconPlugConnected, IconRefresh, IconRobot, IconAlertCircle, IconTrendingUp, IconHeart, IconUserPlus, IconMessageCircle } from '@tabler/icons-react'
+import { IconPlugConnected, IconRefresh, IconRobot, IconAlertCircle, IconTrendingUp, IconHeart, IconUserPlus, IconMessageCircle, IconShare2 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
 import DateFilter from '../../components/ui/DateFilter'
 import { useMeta } from '../../context/MetaContext'
@@ -119,9 +119,11 @@ export default function Dashboard() {
   const cpa               = totalSpend > 0 && totalConversions > 0 ? totalSpend / totalConversions : 0
 
   // Engajamento social (via ações dos anúncios)
+  const hasInsights       = insights.length > 0
   const totalReactions    = insights.reduce((s, i) => s + getActionCount(i.actions, 'post_reaction'), 0)
-  const totalPageLikes    = insights.reduce((s, i) => s + getActionCount(i.actions, 'like'), 0)
+  const totalPageLikes    = insights.reduce((s, i) => s + getActionCount(i.actions, 'like') + getActionCount(i.actions, 'page_like'), 0)
   const totalComments     = insights.reduce((s, i) => s + getActionCount(i.actions, 'comment'), 0)
+  const totalShares       = insights.reduce((s, i) => s + getActionCount(i.actions, 'post'), 0)
 
   // Top campanhas por investimento
   const topCampaigns = [...insights]
@@ -279,57 +281,42 @@ export default function Dashboard() {
       </div>
 
       {/* ── Engajamento Social (linha 3) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border border-border rounded-card p-5 flex items-start gap-4">
-          <div className="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center shrink-0">
-            <IconHeart size={20} className="text-rose-500" strokeWidth={1.5} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-txt-secondary uppercase tracking-wide">Curtidas / Reações</p>
-            {loading ? (
-              <div className="mt-2 h-7 w-20 bg-surface-bg rounded animate-pulse" />
-            ) : (
-              <p className="mt-1 text-2xl font-bold text-txt-primary">
-                {totalReactions > 0 ? formatNumber(totalReactions) : '—'}
-              </p>
-            )}
-            <p className="mt-0.5 text-xs text-txt-secondary">Reações nos posts patrocinados</p>
-          </div>
+      <div className="bg-white border border-border rounded-card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <IconHeart size={16} className="text-rose-500" strokeWidth={1.5} />
+          <h2 className="text-sm font-semibold text-txt-primary">Engajamento Social</h2>
+          <span className="text-xs text-txt-secondary ml-1">via anúncios</span>
         </div>
-
-        <div className="bg-white border border-border rounded-card p-5 flex items-start gap-4">
-          <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center shrink-0">
-            <IconUserPlus size={20} className="text-emerald-600" strokeWidth={1.5} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-txt-secondary uppercase tracking-wide">Novos Seguidores</p>
-            {loading ? (
-              <div className="mt-2 h-7 w-20 bg-surface-bg rounded animate-pulse" />
-            ) : (
-              <p className="mt-1 text-2xl font-bold text-txt-primary">
-                {totalPageLikes > 0 ? formatNumber(totalPageLikes) : '—'}
-              </p>
-            )}
-            <p className="mt-0.5 text-xs text-txt-secondary">Curtidas na página via anúncios</p>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Curtidas / Reações', value: totalReactions, icon: IconHeart,       color: 'text-rose-500',    bg: 'bg-rose-50',    tip: 'Reações nos posts patrocinados' },
+            { label: 'Seguidores ganhos',  value: totalPageLikes, icon: IconUserPlus,    color: 'text-emerald-600', bg: 'bg-emerald-50', tip: 'Curtidas na página via anúncios' },
+            { label: 'Comentários',        value: totalComments,  icon: IconMessageCircle,color:'text-blue-500',    bg: 'bg-blue-50',    tip: 'Comentários nos anúncios' },
+            { label: 'Compartilhamentos',  value: totalShares,    icon: IconShare2,      color: 'text-violet-500',  bg: 'bg-violet-50',  tip: 'Compartilhamentos dos anúncios' },
+          ].map(({ label, value, icon: Icon, color, bg, tip }) => (
+            <div key={label} className="flex items-start gap-3">
+              <div className={`w-9 h-9 ${bg} rounded-full flex items-center justify-center shrink-0`}>
+                <Icon size={16} className={color} strokeWidth={1.5} />
+              </div>
+              <div>
+                <p className="text-xs text-txt-secondary">{label}</p>
+                {loading ? (
+                  <div className="mt-1 h-6 w-12 bg-surface-bg rounded animate-pulse" />
+                ) : (
+                  <p className="text-xl font-bold text-txt-primary">
+                    {hasInsights ? formatNumber(value) : '—'}
+                  </p>
+                )}
+                <p className="text-[10px] text-txt-secondary mt-0.5 leading-tight">{tip}</p>
+              </div>
+            </div>
+          ))}
         </div>
-
-        <div className="bg-white border border-border rounded-card p-5 flex items-start gap-4">
-          <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center shrink-0">
-            <IconMessageCircle size={20} className="text-blue-500" strokeWidth={1.5} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-txt-secondary uppercase tracking-wide">Comentários</p>
-            {loading ? (
-              <div className="mt-2 h-7 w-20 bg-surface-bg rounded animate-pulse" />
-            ) : (
-              <p className="mt-1 text-2xl font-bold text-txt-primary">
-                {totalComments > 0 ? formatNumber(totalComments) : '—'}
-              </p>
-            )}
-            <p className="mt-0.5 text-xs text-txt-secondary">Comentários nos anúncios</p>
-          </div>
-        </div>
+        {hasInsights && !loading && (totalReactions + totalPageLikes + totalComments + totalShares) === 0 && (
+          <p className="mt-3 text-xs text-txt-secondary border-t border-border pt-3">
+            Nenhum engajamento social registrado no período — comum em campanhas de tráfego/conversão sem interações nas publicações.
+          </p>
+        )}
       </div>
 
       {/* ── Grid inferior ── */}
