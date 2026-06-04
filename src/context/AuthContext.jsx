@@ -1,6 +1,7 @@
 // Contexto de autenticação — Supabase
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { loadSystemSettings } from '../utils/planLimits'
 
 const AuthContext = createContext(null)
 
@@ -50,6 +51,7 @@ export function AuthProvider({ children }) {
 
     const initAuth = async () => {
       try {
+        await loadSystemSettings(supabase)
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user && isMounted) {
           // Tenta perfil na tabela profiles; cai para dados do auth se não existir

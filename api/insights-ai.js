@@ -26,7 +26,15 @@ export default async function handler(req, res) {
   const { campaigns, dateLabel, currency = 'BRL' } = req.body
   if (!campaigns?.length) return res.status(400).json({ error: 'campaigns é obrigatório' })
 
-  const apiKey = process.env.GEMINI_API_KEY
+  let apiKey = process.env.GEMINI_API_KEY
+  let aiModel = 'gemini-1.5-flash'
+  
+  const { data: aiConfig } = await supabase.from('system_settings').select('value').eq('id', 'ai_config').single()
+  if (aiConfig?.value) {
+    if (aiConfig.value.geminiApiKey) apiKey = aiConfig.value.geminiApiKey
+    if (aiConfig.value.geminiModel) aiModel = aiConfig.value.geminiModel
+  }
+
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' })
 
   // Formata métricas para o prompt
@@ -95,7 +103,7 @@ Regras:
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: aiModel })
 
     const result = await model.generateContent(prompt)
     const text   = result.response.text().trim()

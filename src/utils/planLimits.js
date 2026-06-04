@@ -61,6 +61,43 @@ export const PLAN_OPTIONS = [
   { id: 'advanced', label: 'Avançado — R$ 147,00/mês' },
 ]
 
+export let SYSTEM_CONFIG = {
+  maintenanceMode: false,
+  globalMessage: ''
+}
+
+// Carrega configurações globais e sobrepõe os limites
+export async function loadSystemSettings(supabase) {
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('id, value')
+      .in('id', ['plan_limits', 'system_config'])
+
+    if (error) {
+      console.error('Erro ao carregar configurações do sistema:', error)
+      return
+    }
+
+    if (data) {
+      const planLimitsObj = data.find(item => item.id === 'plan_limits')?.value
+      if (planLimitsObj) {
+        Object.assign(PLAN_LIMITS.basic, planLimitsObj.basic)
+        Object.assign(PLAN_LIMITS.pro, planLimitsObj.pro)
+        Object.assign(PLAN_LIMITS.advanced, planLimitsObj.advanced)
+      }
+
+      const sysConfigObj = data.find(item => item.id === 'system_config')?.value
+      if (sysConfigObj) {
+        Object.assign(SYSTEM_CONFIG, sysConfigObj)
+      }
+    }
+  } catch (err) {
+    console.error('Erro de conexão ao carregar configurações:', err)
+  }
+}
+
+
 export const PLAN_BADGE_VARIANT = {
   basic:      'default',
   pro:        'brand',

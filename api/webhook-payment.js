@@ -42,16 +42,21 @@ function addDays(date, days) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // Autenticação via secret header
-  const secret = process.env.WEBHOOK_SECRET
-  if (secret && req.headers['x-webhook-secret'] !== secret) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-
   const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
+
+  // Autenticação via secret header
+  let secret = process.env.WEBHOOK_SECRET
+  const { data: whConfig } = await supabase.from('system_settings').select('value').eq('id', 'webhook_config').single()
+  if (whConfig?.value?.secret) {
+    secret = whConfig.value.secret
+  }
+
+  if (secret && req.headers['x-webhook-secret'] !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
 
   const body = req.body
 

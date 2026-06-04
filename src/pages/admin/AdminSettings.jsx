@@ -1,5 +1,5 @@
 // ADIM — Configurações: planos, webhook, alertas, IA e sistema
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   IconDeviceFloppy, IconWebhook, IconBell,
   IconAlertCircle, IconCheck, IconEye, IconEyeOff,
@@ -7,8 +7,8 @@ import {
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Toggle from '../../components/ui/Toggle'
-import { PLAN_LIMITS } from '../../utils/planLimits'
-import { adminSystemConfig } from '../../mock/adminData'
+import { supabase } from '../../lib/supabaseClient'
+import { PLAN_LIMITS, SYSTEM_CONFIG } from '../../utils/planLimits'
 
 function Section({ title, description, children }) {
   return (
@@ -29,25 +29,76 @@ export default function AdminSettings() {
     { ...PLAN_LIMITS.advanced },
   ])
   const [plansSaved, setPlansSaved] = useState(false)
-  const updatePlan = (id, field, value) =>
-    setPlans(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
-  const savePlans = () => { setPlansSaved(true); setTimeout(() => setPlansSaved(false), 2500) }
 
   const [webhook, setWebhook] = useState({ url: '', secret: '', active: false, status: 'not_configured' })
   const [showSecret, setShowSecret] = useState(false)
   const [testingWH, setTestingWH] = useState(false)
   const [webhookSaved, setWebhookSaved] = useState(false)
+
+  const [alerts, setAlerts] = useState({ expiring3days: true, limit90pct: true, alertEmail: '' })
+  const [systemConfig, setSystemConfig] = useState(SYSTEM_CONFIG)
+  const [aiConfig, setAiConfig] = useState({ geminiApiKey: '', geminiModel: 'gemini-2.0-flash' })
+  const [aiSaved, setAiSaved] = useState(false)
+  
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Carrega configurações do Supabase
+  useEffect(() => {
+    async function loadSettings() {
+      setIsLoading(true)
+      const { data, error } = await supabase.from('system_settings').select('id, value')
+      if (data && !error) {
+        const getVal = (id, fallback) => data.find(item => item.id === id)?.value || fallback
+        
+        const dbPlans = getVal('plan_limits', null)
+        if (dbPlans) {
+          setPlans([
+            { ...PLAN_LIMITS.basic, ...dbPlans.basic },
+            { ...PLAN_LIMITS.pro, ...dbPlans.pro },
+            { ...PLAN_LIMITS.advanced, ...dbPlans.advanced },
+          ])
+        }
+        setWebhook(getVal('webhook_config', webhook))
+        setAlerts(getVal('alert_config', alerts))
+        setSystemConfig(getVal('system_config', SYSTEM_CONFIG))
+        setAiConfig(getVal('ai_config', aiConfig))
+      }
+      setIsLoading(false)
+    }
+    loadSettings()
+  }, [])
+
+  // Função auxiliar para salvar no Supabase
+  const saveSetting = async (id, value) => {
+    await supabase.from('system_settings').upsert({ id, value, updated_at: new Date().toISOString() })
+  }
+
+  const updatePlan = (id, field, value) =>
+    setPlans(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+    
+  const savePlans = async () => {
+    const plansObj = {
+      basic: plans.find(p => p.id === 'basic'),
+      pro: plans.find(p => p.id === 'pro'),
+      advanced: plans.find(p => p.id === 'advanced')
+    }
+    await saveSetting('plan_limits', plansObj)
+    Object.assign(PLAN_LIMITS.basic, plansObj.basic)
+    Object.assign(PLAN_LIMITS.pro, plansObj.pro)
+    Object.assign(PLAN_LIMITS.advanced, plansObj.advanced)
+    setPlansSaved(true)
+    setTimeout(() => setPlansSaved(false), 2500)
+  }
+
   const testWebhook = async () => {
     if (!webhook.url) return
     setTestingWH(true)
     await new Promise(r => setTimeout(r, 1500))
-    setWebhook(p => ({ ...p, status: 'connected' }))
+    const updatedWH = { ...webhook, status: 'connected' }
+    setWebhook(updatedWH)
+    await saveSetting('webhook_config', updatedWH)
     setTestingWH(false)
   }
-
-  const [alerts, setAlerts] = useState({ expiring3days: true, limit90pct: true, alertEmail: '' })
-  const [systemConfig, setSystemConfig] = useState(adminSystemConfig)
-  const [aiSaved, setAiSaved] = useState(false)
 
   const PLAN_FIELDS = [
     { key: 'price',     label: 'Preço (R$/mês)', step: '0.01' },
@@ -150,7 +201,7 @@ export default function AdminSettings() {
           <Button variant="secondary" icon={IconWebhook} onClick={testWebhook} disabled={!webhook.url || testingWH}>
             {testingWH ? 'Testando…' : 'Testar conexão'}
           </Button>
-          <Button icon={webhookSaved ? IconCheck : IconDeviceFloppy} onClick={() => { setWebhookSaved(true); setTimeout(() => setWebhookSaved(false), 2500) }} disabled={!webhook.url}>
+          <Button icon={webhookSaved ? IconCheck : IconDeviceFloppy} onClick={async () => { await saveSetting('webhook_config', webhook); setWebhookSaved(true); setTimeout(() => setWebhookSaved(false), 2500) }} disabled={!webhook.url}>
             {webhookSaved ? 'Salvo!' : 'Salvar webhook'}
           </Button>
         </div>
@@ -183,18 +234,18 @@ export default function AdminSettings() {
             placeholder="admin@gespub.ai"
             className="w-full max-w-sm px-3 py-2 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
         </div>
-        <Button icon={IconBell}>Salvar alertas</Button>
+        <Button icon={IconBell} onClick={() => saveSetting('alert_config', alerts)}>Salvar alertas</Button>
       </Section>
 
       {/* IA GLOBAL */}
       <Section title="Inteligência Artificial Global" description="Chave utilizada pelos Agentes IA e Insights de todos os usuários.">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="Google Gemini API Key" name="geminiApiKey" type="password" placeholder="AIza…"
-            value={systemConfig.geminiApiKey || ''} onChange={(e) => setSystemConfig(p => ({ ...p, geminiApiKey: e.target.value }))} />
+            value={aiConfig.geminiApiKey || ''} onChange={(e) => setAiConfig(p => ({ ...p, geminiApiKey: e.target.value }))} />
           <Input label="Modelo padrão" name="geminiModel" placeholder="gemini-2.0-flash"
-            value={systemConfig.geminiModel || ''} onChange={(e) => setSystemConfig(p => ({ ...p, geminiModel: e.target.value }))} />
+            value={aiConfig.geminiModel || ''} onChange={(e) => setAiConfig(p => ({ ...p, geminiModel: e.target.value }))} />
         </div>
-        <Button icon={aiSaved ? IconCheck : IconDeviceFloppy} onClick={() => { setAiSaved(true); setTimeout(() => setAiSaved(false), 2500) }}>
+        <Button icon={aiSaved ? IconCheck : IconDeviceFloppy} onClick={async () => { await saveSetting('ai_config', aiConfig); setAiSaved(true); setTimeout(() => setAiSaved(false), 2500) }}>
           {aiSaved ? 'Salvo!' : 'Salvar IA'}
         </Button>
       </Section>
@@ -215,7 +266,7 @@ export default function AdminSettings() {
             placeholder="Exibida como banner para todos os usuários…" rows={3}
             className="w-full px-3 py-2 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 resize-none" />
         </div>
-        <Button icon={IconDeviceFloppy}>Salvar sistema</Button>
+        <Button icon={IconDeviceFloppy} onClick={async () => { await saveSetting('system_config', systemConfig); Object.assign(SYSTEM_CONFIG, systemConfig); }}>Salvar sistema</Button>
       </Section>
     </div>
   )
