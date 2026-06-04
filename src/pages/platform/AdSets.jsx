@@ -16,10 +16,10 @@ import {
   getAdSetInsights,
   updateAdSetStatus,
   updateAdSetBudget,
+  getActionCount,
   META_STATUS_LABELS,
-
 } from '../../lib/metaApi'
-import { formatCurrency, formatNumber, formatPercent } from '../../utils/formatters'
+import { formatCurrency, formatNumber, formatPercent, formatRoas } from '../../utils/formatters'
 
 const STATUS_STYLE = {
   ACTIVE:   'bg-status-successBg text-status-success',
@@ -210,7 +210,7 @@ export default function AdSets() {
           <table className="w-full min-w-[960px]">
             <thead>
               <tr className="border-b border-border bg-surface-bg">
-                {['Nome', 'Campanha', 'Orç. diário', 'Investido', 'Alcance', 'Impressões', 'CTR', 'CPC', 'Frequência', 'CPM', 'Status', 'Ações'].map(h => (
+                {['Nome', 'Campanha', 'Orç. diário', 'Investido', 'Alcance', 'Impressões', 'CTR', 'CPC', 'Conversões', 'CPA', 'Frequência', 'CPM', 'Status', 'Ações'].map(h => (
                   <th key={h} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -228,6 +228,11 @@ export default function AdSets() {
                 const cpc        = Number(ins.cpc         || 0)
                 const frequency  = Number(ins.frequency   || 0)
                 const cpm        = Number(ins.cpm         || 0)
+                const purchases  = getActionCount(ins.actions, 'purchase')
+                const whatsapp   = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
+                const leads      = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
+                const totalConvs = purchases + whatsapp + leads
+                const cpa        = spend > 0 && totalConvs > 0 ? spend / totalConvs : 0
 
                 return (
                   <tr key={adSet.id} className="border-b border-border last:border-0 hover:bg-surface-bg/50 transition-colors">
@@ -270,6 +275,26 @@ export default function AdSets() {
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
                       {cpc > 0 ? formatCurrency(cpc) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
+                      {totalConvs > 0 ? (
+                        <div>
+                          <span className="font-medium">{formatNumber(totalConvs)}</span>
+                          <p className="text-[10px] text-txt-secondary leading-tight">
+                            {[purchases > 0 && `${purchases} compra${purchases !== 1 ? 's' : ''}`,
+                              whatsapp  > 0 && `${whatsapp} WhatsApp`,
+                              leads     > 0 && `${leads} lead${leads !== 1 ? 's' : ''}`
+                            ].filter(Boolean).join(' · ')}
+                          </p>
+                        </div>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      {cpa > 0 ? (
+                        <span className={`font-semibold ${cpa > 50 ? 'text-status-error' : cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
+                          {formatCurrency(cpa)}
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {frequency > 0 ? (

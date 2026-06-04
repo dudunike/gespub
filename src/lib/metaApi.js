@@ -221,6 +221,30 @@ export async function updateAdStatus(adId, token, status) {
 
 // ---------- HELPERS ----------
 
+// Seguidores reais: páginas Facebook + Instagram Business vinculado
+export async function getPageFollowers(token) {
+  try {
+    const data = await apiFetch('/me/accounts', token, {
+      fields: 'id,name,fan_count,instagram_business_account{id,username,followers_count}',
+      limit: 10,
+    })
+    const pages = data.data || []
+    let fbFollowers = 0
+    let igFollowers = 0
+    let igUsername = null
+    pages.forEach((page) => {
+      fbFollowers += Number(page.fan_count || 0)
+      if (page.instagram_business_account) {
+        igFollowers += Number(page.instagram_business_account.followers_count || 0)
+        if (!igUsername) igUsername = page.instagram_business_account.username
+      }
+    })
+    return { fbFollowers, igFollowers, igUsername, pages }
+  } catch {
+    return { fbFollowers: 0, igFollowers: 0, igUsername: null, pages: [] }
+  }
+}
+
 export function getActionCount(actions, actionType) {
   if (!Array.isArray(actions)) return 0
   const a = actions.find((x) => x.action_type === actionType)

@@ -228,7 +228,7 @@ export default function Campaigns() {
           <table className="w-full min-w-[960px]">
             <thead>
               <tr className="border-b border-border bg-surface-bg">
-                {['Campanha', 'Objetivo', 'Orçamento/dia', 'Investido', 'Impressões', 'Cliques', 'CTR', 'CPC', 'Conversões', 'ROAS', 'Status', 'Ações'].map((h) => (
+                {['Campanha', 'Objetivo', 'Orçamento/dia', 'Investido', 'Impressões', 'Cliques', 'CTR', 'CPC', 'Conversões', 'CPA', 'ROAS', 'Status', 'Ações'].map((h) => (
                   <th key={h} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap">
                     {h}
                   </th>
@@ -244,14 +244,16 @@ export default function Campaigns() {
                 const ctr = Number(ins.ctr || 0)
                 const cpc = Number(ins.cpc || 0)
 
-                // Conversões: Purchase + WhatsApp
+                // Conversões: Purchase + WhatsApp + Leads
                 const purchases = getActionCount(ins.actions, 'purchase')
-                const whatsapp = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
-                const totalConversions = purchases + whatsapp
+                const whatsapp  = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
+                const leads     = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
+                const totalConversions = purchases + whatsapp + leads
 
-                // ROAS
+                // CPA e ROAS
                 const revenue = getActionValue(ins.action_values, 'purchase')
                 const roas = spend > 0 && revenue > 0 ? revenue / spend : 0
+                const cpa  = spend > 0 && totalConversions > 0 ? spend / totalConversions : 0
 
                 const budget = c.daily_budget
                   ? Number(c.daily_budget) / 100
@@ -307,6 +309,13 @@ export default function Campaigns() {
                           )}
                         </div>
                       ) : <span className="text-sm text-txt-secondary">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      {cpa > 0 ? (
+                        <span className={`font-semibold ${cpa > 50 ? 'text-status-error' : cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
+                          {formatCurrency(cpa)}
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {roas > 0 ? (

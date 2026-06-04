@@ -1,9 +1,9 @@
 // Facebook JavaScript SDK — wrapper para OAuth com Meta
 
 const META_API_VERSION = 'v21.0'
-export const META_APP_ID = '2456845514766257'
+export const META_APP_ID = '2072345476678142'
 
-export const META_SCOPE = 'ads_management,pages_read_engagement'
+export const META_SCOPE = 'ads_management,pages_show_list,pages_read_engagement,instagram_basic'
 
 let _sdkPromise = null
 
