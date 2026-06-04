@@ -61,14 +61,25 @@ export function MetaProvider({ children }) {
     return () => { active = false }
   }, [user])
 
-  // Fluxo redirect OAuth — redireciona para o Facebook e volta com token na URL
-  const startConnectRedirect = useCallback(() => {
-    const redirectUri = window.location.origin + '/conexoes'
+  // Fluxo Authorization Code — redireciona para o Facebook, callback no servidor
+  const startConnectRedirect = useCallback(async () => {
+    // Obtém o JWT do usuário para identificar quem está conectando
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    // State codifica o JWT e o origin para o callback server-side
+    const statePayload = JSON.stringify({
+      t: session.access_token,
+      o: window.location.origin,
+    })
+    const state = btoa(statePayload)
+
     const params = new URLSearchParams({
       client_id:     META_APP_ID,
-      redirect_uri:  redirectUri,
+      redirect_uri:  'https://gespub.vercel.app/api/meta-callback',
       scope:         'ads_management,pages_show_list,pages_read_engagement',
-      response_type: 'token',
+      response_type: 'code',
+      state,
     })
     window.location.href = `https://www.facebook.com/dialog/oauth?${params}`
   }, [])

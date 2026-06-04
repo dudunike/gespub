@@ -22,11 +22,29 @@ export default function Connections() {
   const [disconnecting, setDisconnecting]     = useState(false)
   const [processingReturn, setProcessingReturn] = useState(false)
 
-  // Detecta retorno do Facebook OAuth (token está no hash da URL)
+  // Detecta retorno do OAuth (novo fluxo: query params / legado: hash)
   useEffect(() => {
     // Aguarda loadingConnection terminar para evitar conflito com conexão existente
     if (loadingConnection) return
 
+    const url = new URL(window.location.href)
+
+    // ── Novo fluxo (Authorization Code) — servidor já salvou a conexão ──
+    if (url.searchParams.has('connected')) {
+      window.history.replaceState(null, '', window.location.pathname)
+      // Força reload da conexão no contexto
+      window.location.reload()
+      return
+    }
+
+    if (url.searchParams.has('error')) {
+      const errorMsg = url.searchParams.get('error')
+      setLocalError(decodeURIComponent(errorMsg))
+      window.history.replaceState(null, '', window.location.pathname)
+      return
+    }
+
+    // ── Fluxo legado (Implicit — token no hash) ──────────────────────────
     const hash = window.location.hash
     if (!hash || !hash.includes('access_token')) return
 
