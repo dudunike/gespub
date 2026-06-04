@@ -99,10 +99,10 @@ export const RULE_ACTIONS = [
 
 // Frequências de análise dos agentes
 export const ANALYSIS_FREQUENCIES = [
-  { id: 'realtime', label: 'Tempo real' },
-  { id: '6h', label: 'A cada 6h' },
-  { id: '12h', label: 'A cada 12h' },
-  { id: 'daily', label: 'Diário' },
+  { id: '1h',    label: 'A cada 1h'  },
+  { id: '6h',    label: 'A cada 6h'  },
+  { id: '12h',   label: 'A cada 12h' },
+  { id: 'daily', label: 'A cada 24h' },
 ]
 
 // Objetivos de campanha

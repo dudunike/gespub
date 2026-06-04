@@ -4,7 +4,7 @@ export const PLAN_LIMITS = {
   basic: {
     id: 'basic',
     name: 'Básico',
-    price: 19.90,
+    price: 29.90,
     accounts: 1,
     agents: 3,
     rules: 3,
@@ -49,14 +49,14 @@ export const PLAN_LIMITS = {
     rules: 999,
     campaigns: 999,
     insights: 9999,
-    frequency: 'Tempo real',
+    frequency: 'A cada 1h',
     support: 'VIP',
     badge: 'success',
   },
 }
 
 export const PLAN_OPTIONS = [
-  { id: 'basic',    label: 'Básico — R$ 19,90/mês' },
+  { id: 'basic',    label: 'Básico — R$ 29,90/mês' },
   { id: 'pro',      label: 'Pro — R$ 67,90/mês' },
   { id: 'advanced', label: 'Avançado — R$ 147,00/mês' },
 ]

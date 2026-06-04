@@ -60,7 +60,7 @@ const EMPTY_FORM = {
   scope_items: [],
 }
 
-const FREQ_LABELS = { realtime: 'Tempo real', '6h': 'A cada 6h', '12h': 'A cada 12h', daily: 'Diário' }
+const FREQ_LABELS = { '1h': 'A cada 1h', '6h': 'A cada 6h', '12h': 'A cada 12h', daily: 'A cada 24h' }
 const METRIC_LABELS = { roas: 'ROAS', cpa: 'CPA', ctr: 'CTR', cpc: 'CPC', cpm: 'CPM', frequency: 'Frequência', conversions: 'Conversões', impressions: 'Impressões' }
 
 // ─────────────────────────────────────────────
