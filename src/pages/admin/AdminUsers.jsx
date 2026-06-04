@@ -408,22 +408,34 @@ export default function AdminUsers() {
         <Button onClick={() => setShowCreate(true)} icon={IconPlus}>Criar usuário</Button>
       </div>
 
-      {/* Resumo de planos */}
-      <div className="grid grid-cols-3 gap-3">
-        {['basic', 'pro', 'advanced'].map(p => {
-          const count = users.filter(u => u.plan === p).length
-          const info = getPlan(p)
+      {/* Resumo de planos + MRR */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {['basic', 'pro', 'advanced', 'enterprise'].map(p => {
+          const count  = users.filter(u => u.plan === p && u.status === 'active').length
+          const info   = getPlan(p)
+          const mrr    = count * info.price
+          if (count === 0 && p === 'enterprise') return null
           return (
-            <div key={p} className="bg-white border border-border rounded-card px-4 py-3 flex items-center gap-3">
-              <Badge variant={PLAN_BADGE_VARIANT[p]}>{info.name}</Badge>
-              <div className="flex-1">
-                <p className="text-lg font-bold text-txt-primary">{count}</p>
-                <p className="text-xs text-txt-secondary">usuário{count !== 1 ? 's' : ''}</p>
+            <div key={p} className="bg-white border border-border rounded-card px-4 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <Badge variant={PLAN_BADGE_VARIANT[p]}>{info.name}</Badge>
+                <span className="text-lg font-bold text-txt-primary">{count}</span>
               </div>
-              <p className="text-xs text-txt-secondary">R$ {info.price.toFixed(2).replace('.', ',')}</p>
+              <p className="text-xs text-txt-secondary">usuário{count !== 1 ? 's' : ''} ativos</p>
+              {info.price > 0 && <p className="text-xs font-semibold text-status-success mt-0.5">MRR: R$ {mrr.toFixed(2).replace('.', ',')}</p>}
             </div>
           )
-        })}
+        }).filter(Boolean)}
+        <div className="bg-brand-50 border border-brand-100 rounded-card px-4 py-3">
+          <p className="text-xs font-medium text-brand-500 uppercase tracking-wide mb-1">MRR Total</p>
+          <p className="text-xl font-bold text-brand-500">
+            R$ {['basic','pro','advanced'].reduce((s, p) => {
+              const count = users.filter(u => u.plan === p && u.status === 'active').length
+              return s + count * (getPlan(p).price || 0)
+            }, 0).toFixed(2).replace('.', ',')}
+          </p>
+          <p className="text-xs text-brand-500 mt-0.5">{users.filter(u => u.status === 'active').length} ativos</p>
+        </div>
       </div>
 
       {/* Tabela */}
