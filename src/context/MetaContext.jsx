@@ -66,7 +66,7 @@ export function MetaProvider({ children }) {
     const params = new URLSearchParams({
       client_id:     META_APP_ID,
       redirect_uri:  'https://gespub.online/conexoes',
-      scope:         'ads_management,pages_show_list,pages_read_engagement,instagram_basic',
+      scope:         'ads_management,pages_show_list,pages_read_engagement',
       response_type: 'token',
     })
     window.location.href = `https://www.facebook.com/dialog/oauth?${params}`
