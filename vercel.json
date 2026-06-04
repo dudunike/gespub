@@ -8,11 +8,5 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/run-agents",
-      "schedule": "0 */6 * * *"
-    }
   ]
 }
