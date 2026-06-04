@@ -61,7 +61,10 @@ export default async function handler(req, res) {
     return redirectTo('/conexoes?error=Erro de configuração do servidor')
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
+  // Supabase client com o JWT do usuário no cabeçalho para passar nas regras RLS
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } }
+  })
 
   // Verifica o usuário pelo JWT
   const { data: { user }, error: authErr } = await supabase.auth.getUser(jwt)
