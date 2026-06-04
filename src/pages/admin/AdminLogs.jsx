@@ -41,9 +41,10 @@ export default function AdminLogs() {
   const loadLogs = useCallback(async (pg = 0) => {
     setLoading(true); setError(null)
     try {
+      // Busca logs + agentes em uma query (FK agent_id → agents garantida)
       let q = supabase
         .from('agent_logs')
-        .select('id, action, message, executed_at, metric_key, metric_value, agent_id, user_id, agents(name), profiles(name, email)', { count: 'exact' })
+        .select('id, action, message, executed_at, metric_key, metric_value, agent_id, user_id, agents(name, user_id)', { count: 'exact' })
         .order('executed_at', { ascending: false })
         .range(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE - 1)
 
@@ -56,12 +57,27 @@ export default function AdminLogs() {
       if (err) throw new Error(err.message)
 
       let rows = data || []
+
+      // Busca perfis dos user_ids únicos separadamente (evita erro de FK não declarada)
+      const uids = [...new Set(rows.map(r => r.user_id).filter(Boolean))]
+      let profileMap = {}
+      if (uids.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .in('id', uids)
+        ;(profiles || []).forEach(p => { profileMap[p.id] = p })
+      }
+
+      // Injeta perfil em cada log
+      rows = rows.map(r => ({ ...r, profile: profileMap[r.user_id] || null }))
+
       if (search) {
         const s = search.toLowerCase()
         rows = rows.filter(l =>
           l.message?.toLowerCase().includes(s) ||
-          l.profiles?.name?.toLowerCase().includes(s) ||
-          l.profiles?.email?.toLowerCase().includes(s) ||
+          l.profile?.name?.toLowerCase().includes(s) ||
+          l.profile?.email?.toLowerCase().includes(s) ||
           l.agents?.name?.toLowerCase().includes(s)
         )
       }
@@ -83,8 +99,8 @@ export default function AdminLogs() {
     const headers = ['Data/Hora', 'Usuário', 'E-mail', 'Agente', 'Ação', 'Mensagem', 'Métrica', 'Valor']
     const rows = logs.map(l => [
       l.executed_at ? new Date(l.executed_at).toLocaleString('pt-BR') : '',
-      l.profiles?.name  || '',
-      l.profiles?.email || '',
+      l.profile?.name  || '',
+      l.profile?.email || '',
       l.agents?.name    || '',
       l.action          || '',
       (l.message        || '').replace(/,/g, ' '),
@@ -199,8 +215,8 @@ export default function AdminLogs() {
                       {log.executed_at ? formatDateTime(log.executed_at) : '—'}
                     </td>
                     <td className="px-4 py-3 max-w-[160px]">
-                      <p className="text-sm font-medium text-txt-primary truncate">{log.profiles?.name || '—'}</p>
-                      <p className="text-xs text-txt-secondary truncate">{log.profiles?.email || ''}</p>
+                      <p className="text-sm font-medium text-txt-primary truncate">{log.profile?.name || '—'}</p>
+                      <p className="text-xs text-txt-secondary truncate">{log.profile?.email || ''}</p>
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-secondary whitespace-nowrap max-w-[140px] truncate">
                       {log.agents?.name || '—'}

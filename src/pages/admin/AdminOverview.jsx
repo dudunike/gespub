@@ -75,7 +75,7 @@ export default function AdminOverview() {
         supabase.from('agents').select('*', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('profiles').select('plan, status'),
         supabase.from('agent_logs')
-          .select('id, action, message, executed_at, agent_id, user_id, agents(name), profiles(name, email)')
+          .select('id, action, message, executed_at, agent_id, user_id, agents(name, user_id)')
           .order('executed_at', { ascending: false })
           .limit(15),
         supabase.from('agent_logs')
@@ -111,10 +111,19 @@ export default function AdminOverview() {
       })
       const chart = Object.entries(days).map(([dia, total]) => ({ dia, total }))
 
+      // Buscar perfis dos user_ids dos logs separadamente
+      const uids = [...new Set((logs || []).map(l => l.user_id).filter(Boolean))]
+      let profileMap = {}
+      if (uids.length > 0) {
+        const { data: profiles } = await supabase.from('profiles').select('id, name, email').in('id', uids)
+        ;(profiles || []).forEach(p => { profileMap[p.id] = p })
+      }
+      const logsWithProfile = (logs || []).map(l => ({ ...l, profile: profileMap[l.user_id] || null }))
+
       setStats({ totalUsers: totalUsers || 0, agentsActive: agentsActive || 0, logsToday, mrr })
       setPlanBreakdown(breakdown)
       setExecChart(chart)
-      setRecentLogs(logs || [])
+      setRecentLogs(logsWithProfile)
     } catch (e) {
       console.warn('AdminOverview load error:', e)
     } finally {
@@ -266,7 +275,7 @@ export default function AdminOverview() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-txt-primary truncate">
-                          <span className="font-medium">{log.profiles?.name || log.profiles?.email || 'Usuário'}</span>
+                          <span className="font-medium">{log.profile?.name || log.profile?.email || 'Usuário'}</span>
                           {log.agents?.name && <span className="text-brand-500"> · {log.agents.name}</span>}
                         </p>
                         <p className="text-xs text-txt-secondary mt-0.5 truncate">{log.message || '—'}</p>
