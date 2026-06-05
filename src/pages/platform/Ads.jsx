@@ -58,6 +58,13 @@ function StatusChip({ status }) {
 //   - object_story_spec.link_data.child_attachments[].image_url: carrossel alta res
 //   - object_story_spec.video_data.image_url: thumbnail do vídeo em boa res
 //   - asset_feed_spec.images[].url/hash: imagens do catálogo
+// Limpa modificadores de resolução das URLs do Facebook CDN para obter a imagem original em alta qualidade
+// Ex: remove /p100x100/, /s130x130/, /p480x480/ etc.
+function cleanFbUrl(url) {
+  if (!url) return null
+  return url.replace(/\/[ps]\d+x\d+\//g, '/')
+}
+
 function getBestImageUrl(creative, type) {
   if (!creative) return null
 
@@ -67,41 +74,40 @@ function getBestImageUrl(creative, type) {
   const photoData = story.photo_data || {}
   const feedSpec = creative.asset_feed_spec || {}
 
+  const anyFeedImage = feedSpec.images?.[0]?.url || feedSpec.images?.[0]?.image_url
+  const anyFeedVideo = feedSpec.videos?.[0]?.thumbnail_url
+  const anyChildImage = linkData.child_attachments?.[0]?.image_url || linkData.child_attachments?.[0]?.picture
+
+  let url = null
+
   // Para vídeos: priorizar capa do vídeo em alta res
   if (type === 'video') {
-    return (
-      videoData.image_url ||         // capa HD do vídeo
-      creative.image_url ||          // imagem do criativo
-      linkData.picture ||            // picture do link
-      creative.thumbnail_url ||      // último recurso
-      null
-    )
+    url = videoData.image_url ||
+          anyFeedVideo ||
+          creative.image_url ||
+          linkData.picture ||
+          anyFeedImage ||
+          creative.thumbnail_url
   }
-
   // Para carrossel: usar primeira imagem do child_attachments
-  if (type === 'carousel') {
-    const children = linkData.child_attachments || []
-    const firstChild = children[0]
-    if (firstChild) {
-      return firstChild.image_url || firstChild.picture || creative.image_url || creative.thumbnail_url || null
-    }
+  else if (type === 'carousel') {
+    url = anyChildImage ||
+          creative.image_url ||
+          linkData.image_url ||
+          creative.thumbnail_url
+  }
+  // Para imagem: priorizar fontes de alta resolução
+  else {
+    url = linkData.image_url ||
+          photoData.url ||
+          anyFeedImage ||
+          linkData.picture ||
+          anyChildImage ||
+          creative.image_url ||
+          creative.thumbnail_url
   }
 
-  // Para imagem: priorizar fontes de alta resolução
-  // link_data.image_url é geralmente a imagem original em alta res
-  // link_data.picture pode ser uma versão redimensionada
-  // creative.image_url pode ser resolução média
-  // creative.thumbnail_url é sempre baixa resolução
-  return (
-    linkData.image_url ||            // imagem original do link (alta res)
-    photoData.url ||                 // imagem direta da foto
-    linkData.picture ||              // picture do link
-    creative.image_url ||            // imagem do criativo (resolução média)
-    // asset_feed_spec pode ter imagens em catálogos dinâmicos
-    feedSpec.images?.[0]?.url ||
-    creative.thumbnail_url ||        // último recurso — baixa resolução
-    null
-  )
+  return cleanFbUrl(url)
 }
 
 // Preview visual do criativo com qualidade máxima
@@ -263,6 +269,7 @@ export default function Ads() {
     const conversions  = getActionCount(ins.actions, 'purchase')
                        + getActionCount(ins.actions, 'lead')
                        + getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
+    const cpa          = conversions > 0 ? spend / conversions : 0
     const reactions    = getActionCount(ins.actions, 'post_reaction')
     const pageLikes    = getActionCount(ins.actions, 'like')
     const comments     = getActionCount(ins.actions, 'comment')
@@ -283,7 +290,7 @@ export default function Ads() {
       adSetId,
       campaignName: ad.campaign?.name || campaignMap[campaignId] || campaignId || '—',
       adSetName:    ad.adset?.name    || adSetMap[adSetId]       || adSetId    || '—',
-      spend, impressions, clicks, ctr, cpc, frequency, reach, conversions,
+      spend, impressions, clicks, ctr, cpc, frequency, reach, conversions, cpa,
       reactions, pageLikes, comments,
       __account_name: ad.__account_name,
       __account_id: ad.__account_id
@@ -549,18 +556,12 @@ export default function Ads() {
                       <p className="font-semibold text-txt-primary">{ad.impressions > 0 ? formatNumber(ad.impressions) : '—'}</p>
                     </div>
                     <div>
-                      <p className="text-txt-secondary">CTR</p>
-                      <p className={`font-semibold ${ad.ctr > 3 ? 'text-status-success' : 'text-txt-primary'}`}>
-                        {ad.ctr > 0 ? formatPercent(ad.ctr) : '—'}
+                      <p className="text-txt-secondary">CTR / CPC</p>
+                      <p className="font-semibold text-txt-primary">
+                        <span className={ad.ctr > 3 ? 'text-status-success' : ''}>{ad.ctr > 0 ? formatPercent(ad.ctr) : '—'}</span>
+                        <span className="text-txt-secondary font-normal mx-1">•</span>
+                        <span>{ad.cpc > 0 ? formatCurrency(ad.cpc) : '—'}</span>
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-txt-secondary">CPC</p>
-                      <p className="font-semibold text-txt-primary">{ad.cpc > 0 ? formatCurrency(ad.cpc) : '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-txt-secondary">Alcance</p>
-                      <p className="font-semibold text-txt-primary">{ad.reach > 0 ? formatNumber(ad.reach) : '—'}</p>
                     </div>
                     <div>
                       <p className="text-txt-secondary">Frequência</p>
@@ -568,19 +569,13 @@ export default function Ads() {
                         {ad.frequency > 0 ? `${ad.frequency.toFixed(1)}×` : '—'}
                       </p>
                     </div>
-                    <div className="flex items-start gap-1">
-                      <IconHeart size={11} className="text-rose-400 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-txt-secondary">Curtidas</p>
-                        <p className="font-semibold text-txt-primary">{ad.reactions > 0 ? formatNumber(ad.reactions) : '—'}</p>
-                      </div>
+                    <div>
+                      <p className="text-txt-secondary">Conversões</p>
+                      <p className="font-semibold text-txt-primary">{ad.conversions > 0 ? formatNumber(ad.conversions) : '—'}</p>
                     </div>
-                    <div className="flex items-start gap-1">
-                      <IconUserPlus size={11} className="text-emerald-500 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-txt-secondary">Seguidores</p>
-                        <p className="font-semibold text-txt-primary">{ad.pageLikes > 0 ? formatNumber(ad.pageLikes) : '—'}</p>
-                      </div>
+                    <div>
+                      <p className="text-txt-secondary">CPA</p>
+                      <p className="font-semibold text-txt-primary">{ad.cpa > 0 ? formatCurrency(ad.cpa) : '—'}</p>
                     </div>
                   </div>
 
@@ -617,7 +612,7 @@ export default function Ads() {
                   { k: 'name', l: 'Anúncio' }, { k: 'campaignName', l: 'Campanha / Conjunto' }, { k: 'type', l: 'Tipo' },
                   { k: 'spend', l: 'Investido' }, { k: 'impressions', l: 'Impressões' }, { k: 'ctr', l: 'CTR' },
                   { k: 'cpc', l: 'CPC' }, { k: 'frequency', l: 'Frequência' }, { k: 'reactions', l: 'Curtidas' },
-                  { k: 'pageLikes', l: 'Seguidores' }, { k: 'conversions', l: 'Conversões' }, { k: 'status', l: 'Status' }
+                  { k: 'pageLikes', l: 'Seguidores' }, { k: 'conversions', l: 'Conversões' }, { k: 'cpa', l: 'CPA' }, { k: 'status', l: 'Status' }
                 ].map((col) => (
                   <th key={col.k} onClick={() => handleSort(col.k)} className="text-left text-xs font-medium text-txt-secondary px-3 py-3 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-txt-primary">
                     {col.l} <SortIcon field={col.k} />
@@ -686,6 +681,9 @@ export default function Ads() {
                     <td className="px-3 py-3 text-sm text-txt-primary whitespace-nowrap">
                       {ad.conversions > 0 ? formatNumber(ad.conversions) : '—'}
                     </td>
+                    <td className="px-3 py-3 text-sm font-medium text-txt-primary whitespace-nowrap">
+                      {ad.cpa > 0 ? formatCurrency(ad.cpa) : '—'}
+                    </td>
                     <td className="px-3 py-3 whitespace-nowrap">
                       <StatusChip status={ad.status} />
                     </td>
@@ -729,6 +727,7 @@ export default function Ads() {
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
+                <td className="px-3 py-3 text-sm font-bold text-txt-primary">{tConv > 0 ? formatCurrency(tSpend / tConv) : '—'}</td>
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3"></td>
               </tr>
