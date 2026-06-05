@@ -94,9 +94,9 @@ export default function AdSets() {
     if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true); setError(null)
     try {
-      const allAdSetsRaw = await Promise.all(activeAccounts.map(acc => getAdSets(acc.account_id, accessToken)))
-      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getAdSetInsights(acc.account_id, accessToken, datePreset, timeRange)))
-      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id, accessToken)))
+      const allAdSetsRaw = await Promise.all(activeAccounts.map(acc => getAdSets(acc.account_id)))
+      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getAdSetInsights(acc.account_id, datePreset, timeRange)))
+      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id)))
 
       const mergedAdSets = []
       allAdSetsRaw.forEach((arr, i) => {
@@ -122,7 +122,7 @@ export default function AdSets() {
     const newStatus = (adSet.effective_status || adSet.status) === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
     setToggling(t => ({ ...t, [adSet.id]: true }))
     try {
-      await updateAdSetStatus(adSet.id, accessToken, newStatus)
+      await updateAdSetStatus(adSet.id, newStatus)
       setAdSets(prev => prev.map(a => a.id === adSet.id
         ? { ...a, status: newStatus, effective_status: newStatus } : a))
     } catch (err) { setError(err.message) }
@@ -131,7 +131,7 @@ export default function AdSets() {
 
   const handleSaveBudget = async (adSetId, cents) => {
     try {
-      await updateAdSetBudget(adSetId, accessToken, cents)
+      await updateAdSetBudget(adSetId, cents)
       setAdSets(prev => prev.map(a => a.id === adSetId
         ? { ...a, daily_budget: String(cents) } : a))
     } catch (err) { setError(err.message) }

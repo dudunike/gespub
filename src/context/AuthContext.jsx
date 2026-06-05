@@ -80,22 +80,24 @@ export function AuthProvider({ children }) {
 
     initAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        const profile =
-          (await fetchProfile(session.user.id, session.user.email)) ||
-          buildProfileFromSession(session.user)
+        (async () => {
+          const profile =
+            (await fetchProfile(session.user.id, session.user.email)) ||
+            buildProfileFromSession(session.user)
 
-        if (isMounted) {
-          if (profile.status === 'blocked') {
-            await supabase.auth.signOut()
-            setUser(null)
-            setIsAuthenticated(false)
-          } else {
-            setUser(profile)
-            setIsAuthenticated(true)
+          if (isMounted) {
+            if (profile.status === 'blocked') {
+              await supabase.auth.signOut()
+              setUser(null)
+              setIsAuthenticated(false)
+            } else {
+              setUser(profile)
+              setIsAuthenticated(true)
+            }
           }
-        }
+        })()
       } else if (isMounted) {
         setUser(null)
         setIsAuthenticated(false)

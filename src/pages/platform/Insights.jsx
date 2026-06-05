@@ -139,7 +139,7 @@ export default function Insights() {
     if (!isConnected || !accessToken || !accountId || !canGenerate) return
     setLoading(true); setError(null)
     try {
-      const data = await getCampaignInsights(accountId, accessToken, datePreset)
+      const data = await getCampaignInsights(accountId, datePreset)
       if (!data.length) { setInsights([]); setCampaignData([]); return }
       setCampaignData(data)
 
@@ -207,10 +207,10 @@ export default function Insights() {
     setApplying(insight.id)
     try {
       if (insight.action === 'increase_budget' && insight.actionValue) {
-        await updateCampaignBudget(insight.campaignId, accessToken, insight.actionValue)
+        await updateCampaignBudget(insight.campaignId, insight.actionValue)
         setApplied(p => new Set([...p, insight.id]))
       } else if (insight.action === 'pause_campaign') {
-        await updateCampaignStatus(insight.campaignId, accessToken, 'PAUSED')
+        await updateCampaignStatus(insight.campaignId, 'PAUSED')
         setApplied(p => new Set([...p, insight.id]))
       } else {
         window.open(`https://business.facebook.com/adsmanager/manage/campaigns?act=${accountId?.replace('act_','')}&selected_campaign_ids=${insight.campaignId}`,'_blank')

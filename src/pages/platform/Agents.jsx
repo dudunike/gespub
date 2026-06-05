@@ -567,7 +567,7 @@ export default function Agents() {
   useEffect(() => {
     if (!isConnected || !accessToken || !accountId) return
     import('../../lib/metaApi').then(({ getCampaigns }) => {
-      getCampaigns(accountId, accessToken)
+      getCampaigns(accountId)
         .then(data => setCampaigns(data.filter(c => c.effective_status === 'ACTIVE' || c.status === 'ACTIVE')))
         .catch(() => {})
     })

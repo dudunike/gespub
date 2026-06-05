@@ -72,7 +72,7 @@ export default function Dashboard() {
     setError(null)
     try {
       const allInsights = await Promise.all(activeAccounts.map(acc => 
-        getCampaignInsights(acc.account_id, accessToken, datePreset, timeRange)
+        getCampaignInsights(acc.account_id, datePreset, timeRange)
       ))
       setInsights(allInsights.flat())
       setLastUpdated(new Date())
@@ -91,8 +91,8 @@ export default function Dashboard() {
   // Busca seguidores reais do Facebook e Instagram
   useEffect(() => {
     if (!isConnected || !accessToken) return
-    getPageFollowers(accessToken).then(setFollowers).catch(() => {})
-  }, [isConnected, accessToken])
+    getPageFollowers().then(setFollowers).catch(() => {})
+  }, [isConnected])
 
   // Contagem de agentes ativos
   useEffect(() => {

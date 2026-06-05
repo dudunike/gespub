@@ -102,8 +102,8 @@ export default function Campaigns() {
     setLoading(true)
     setError(null)
     try {
-      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id, accessToken)))
-      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getCampaignInsights(acc.account_id, accessToken, datePreset, timeRange)))
+      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id)))
+      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getCampaignInsights(acc.account_id, datePreset, timeRange)))
 
       const mergedCampaigns = []
       allCampaignsRaw.forEach((campArray, i) => {
@@ -130,7 +130,7 @@ export default function Campaigns() {
     const newStatus = campaign.effective_status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
     setToggling((t) => ({ ...t, [campaign.id]: true }))
     try {
-      await updateCampaignStatus(campaign.id, accessToken, newStatus)
+      await updateCampaignStatus(campaign.id, newStatus)
       setCampaigns((prev) =>
         prev.map((c) =>
           c.id === campaign.id ? { ...c, status: newStatus, effective_status: newStatus } : c
@@ -146,7 +146,7 @@ export default function Campaigns() {
   // Salvar novo orçamento
   const handleSaveBudget = async (campaignId, cents) => {
     try {
-      await updateCampaignBudget(campaignId, accessToken, cents)
+      await updateCampaignBudget(campaignId, cents)
       setCampaigns((prev) =>
         prev.map((c) =>
           c.id === campaignId ? { ...c, daily_budget: String(cents) } : c

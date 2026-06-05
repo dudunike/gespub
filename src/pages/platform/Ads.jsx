@@ -132,10 +132,10 @@ export default function Ads() {
     if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true); setError(null)
     try {
-      const allAdsRaw = await Promise.all(activeAccounts.map(acc => getAdsWithCreatives(acc.account_id, accessToken)))
-      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getAdInsights(acc.account_id, accessToken, datePreset, timeRange)))
-      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id, accessToken)))
-      const allAdSetsRaw = await Promise.all(activeAccounts.map(acc => getAdSets(acc.account_id, accessToken)))
+      const allAdsRaw = await Promise.all(activeAccounts.map(acc => getAdsWithCreatives(acc.account_id)))
+      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getAdInsights(acc.account_id, datePreset, timeRange)))
+      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id)))
+      const allAdSetsRaw = await Promise.all(activeAccounts.map(acc => getAdSets(acc.account_id)))
 
       const mergedAds = []
       allAdsRaw.forEach((arr, i) => {
@@ -161,7 +161,7 @@ export default function Ads() {
     const newStatus = (ad.effective_status || ad.status) === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
     setToggling((t) => ({ ...t, [ad.id]: true }))
     try {
-      await updateAdStatus(ad.id, accessToken, newStatus)
+      await updateAdStatus(ad.id, newStatus)
       setAds((prev) => prev.map((a) => a.id === ad.id
         ? { ...a, status: newStatus, effective_status: newStatus } : a))
     } catch (err) { setError(err.message) }
