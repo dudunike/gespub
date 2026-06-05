@@ -146,29 +146,10 @@ export default function Connections() {
       return
     }
 
-    // Server salvou PENDING e redirecionou aqui — busca contas disponíveis
-    if (selecting) {
-      if (!user) return
+    if (isConnected || errCode || window.location.hash.includes('access_token')) {
       window.history.replaceState(null, '', window.location.pathname)
-      setProcessingReturn(true)
-      getAdAccounts()
-        .then(accs => {
-          if (!accs.length) {
-            setLocalError('Nenhuma conta de anúncios encontrada no Facebook.')
-            return
-          }
-          setAvailableAccounts(accs)
-          setStep('selecting')
-        })
-        .catch(err => setLocalError(err.message))
-        .finally(() => setProcessingReturn(false))
-      return
     }
-
-    if (errCode) {
-      window.history.replaceState(null, '', window.location.pathname)
-      setLocalError(errCode)
-    }
+    if (errCode) setLocalError(errCode)
   }, [loadingConnection, user])
 
   const handleAddAccount = async () => {

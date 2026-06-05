@@ -125,27 +125,62 @@ export default async function handler(req, res) {
       return redirectTo('/conexoes?error=Token não recebido do Facebook')
     }
 
-    // Desativa outras conexões para garantir que a nova PENDING seja a ativa
-    await supabase.from('meta_connections').update({ is_active: false }).eq('user_id', user.id)
+    // ── Busca as contas de anúncio do usuário ─────────────────────────────
+    const accountsRes = await fetch(
+      `https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,currency&access_token=${accessToken}`
+    )
+    const accountsData = await accountsRes.json()
+    const accounts = accountsData.data || []
 
-    // ── Salva o token temporariamente como PENDING ───────────────────────
-    const { error: dbErr } = await supabase.from('meta_connections').upsert({
-      user_id: user.id,
-      access_token: accessToken,
-      account_id: 'PENDING',
-      account_name: 'Selecionando Conta...',
-      currency: 'BRL',
-      connected_at: new Date().toISOString(),
-      is_active: true,
-    }, { onConflict: 'user_id,account_id' })
-
-    if (dbErr) {
-      console.error('[meta-callback] DB save error:', dbErr.message)
-      return redirectTo(`/conexoes?error=${encodeURIComponent('Erro ao salvar token: ' + dbErr.message)}`)
+    if (accounts.length === 0) {
+      return redirectTo('/conexoes?error=Nenhuma conta de anúncios encontrada neste perfil do Facebook')
     }
 
-    console.log(`[meta-callback] ✅ Token recebido para: ${user.email}. Redirecionando para seleção.`)
-    return redirectTo('/conexoes?selecting=1')
+    // Busca o plano do usuário (para limites)
+    const { data: userData } = await supabase.from('users').select('plan, role').eq('id', user.id).single()
+    const planLimits = { basic: 1, pro: 3, advanced: 10, enterprise: 999, starter: 2 }
+    const limit = userData?.role === 'admin' ? 999 : (planLimits[userData?.plan || 'basic'] || 1)
+
+    // Seleciona as contas até o limite do plano
+    const accountsToConnect = accounts.slice(0, limit)
+
+    // Desativa TODAS as conexões atuais do usuário para garantir que apenas a nova seja ativa
+    await supabase.from('meta_connections').update({ is_active: false }).eq('user_id', user.id)
+
+    for (let i = 0; i < accountsToConnect.length; i++) {
+      const account = accountsToConnect[i]
+      const isActive = (i === 0) // Define a primeira como ativa por padrão
+
+      // Verifica se a conexão já existe para evitar erros de constraint com upsert
+      const { data: existing } = await supabase.from('meta_connections')
+        .select('id').eq('user_id', user.id).eq('account_id', account.id).single()
+
+      if (existing) {
+        await supabase.from('meta_connections').update({
+          access_token: accessToken,
+          account_name: account.name,
+          currency: account.currency || 'BRL',
+          connected_at: new Date().toISOString(),
+          is_active: isActive
+        }).eq('id', existing.id)
+      } else {
+        await supabase.from('meta_connections').insert({
+          user_id: user.id,
+          access_token: accessToken,
+          account_id: account.id,
+          account_name: account.name,
+          currency: account.currency || 'BRL',
+          connected_at: new Date().toISOString(),
+          is_active: isActive
+        })
+      }
+    }
+
+    // Remove qualquer PENDING antigo (caso exista de tentativas anteriores)
+    await supabase.from('meta_connections').delete().eq('user_id', user.id).eq('account_id', 'PENDING')
+
+    console.log(`[meta-callback] ✅ Conectado: ${user.email} → ${accountsToConnect.length} contas adicionadas automaticamente.`)
+    return redirectTo('/conexoes?connected=1')
 
   } catch (err) {
     console.error('[meta-callback] Unexpected error:', err)
