@@ -50,10 +50,8 @@ function AdminRoute({ children }) {
 
 // Rota de login — redireciona se já autenticado
 function PublicRoute({ children }) {
-  const { isAuthenticated, isAdmin } = useAuth()
-  if (isAuthenticated) {
-    return <Navigate to={isAdmin ? '/admin' : '/dashboard'} replace />
-  }
+  const { isAuthenticated } = useAuth()
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />
   return children
 }
 
