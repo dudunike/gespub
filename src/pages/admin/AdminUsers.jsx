@@ -343,20 +343,71 @@ export default function AdminUsers() {
   }
 
   const handleCreateUser = async (form) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
+    const { data: { session: adminSession } } = await supabase.auth.getSession()
+    if (!adminSession?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
 
-    const res = await fetch('/api/admin-create-user', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({ form })
+    try {
+      // Tentativa 1: Via API (Seguro e não afeta a sessão do navegador)
+      const res = await fetch('/api/admin-create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminSession.access_token}`
+        },
+        body: JSON.stringify({ form })
+      })
+
+      const result = await res.json()
+      
+      if (res.ok) {
+        await loadUsers()
+        return
+      }
+
+      // Se falhou por outro motivo que não seja a chave ausente, exibe o erro
+      if (!result.error?.includes('service_key ausente') && !result.error?.includes('Configuração do servidor')) {
+        throw new Error(result.error)
+      }
+    } catch (e) {
+      if (!e.message.includes('service_key ausente') && !e.message.includes('Configuração do servidor')) {
+        throw e
+      }
+    }
+
+    // FALLBACK: Criação pelo Cliente (Supabase Auth)
+    // Ocorre apenas se a service_role key não estiver configurada no backend
+    const { data, error } = await supabase.auth.signUp({
+      email:    form.email,
+      password: form.password,
+      options:  { data: { name: form.name } },
     })
 
-    const result = await res.json()
-    if (!res.ok) throw new Error(result.error || 'Erro desconhecido ao criar usuário.')
+    if (error) {
+      if (adminSession) await supabase.auth.setSession({ access_token: adminSession.access_token, refresh_token: adminSession.refresh_token })
+      throw new Error(error.message)
+    }
+
+    if (data?.user) {
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id:              data.user.id,
+        name:            form.name,
+        role:            'user',
+        plan:            form.plan,
+        status:          form.status,
+        plan_start_at:   form.plan_start_at   || null,
+        plan_expires_at: form.plan_expires_at || null,
+      })
+
+      // Restaura a sessão do administrador imediatamente após a criação do usuário
+      if (adminSession) {
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token
+        })
+      }
+
+      if (profileError) throw new Error(profileError.message)
+    }
 
     await loadUsers()
   }
