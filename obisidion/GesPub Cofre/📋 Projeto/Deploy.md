@@ -1,6 +1,6 @@
 ---
 título: Deploy & Infraestrutura
-atualizado: 2026-06-01 02:00
+atualizado: 2026-06-04
 status: produção (Vercel) | pronto para VPS
 ---
 
@@ -23,13 +23,14 @@ status: produção (Vercel) | pronto para VPS
 
 ---
 
-## Variáveis de Ambiente (Vercel)
+## Variáveis de Ambiente
 
 | Variável | Onde pegar |
 |----------|-----------|
 | `SUPABASE_URL` | Supabase → Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → service_role |
-| `CRON_SECRET` | `gespub-cron-2026` (qualquer string) |
+| `META_APP_SECRET` | Meta for Developers → Configurações do app → App Secret |
+| `CRON_SECRET` | qualquer string secreta (ex: `gespub-cron-2026`) |
 | `CRONJOB_API_KEY` | cron-job.org → Settings → API Keys |
 | `CRONJOB_BASE_URL` | `https://gespub.online` |
 | `GEMINI_API_KEY` | aistudio.google.com → Get API key |
@@ -37,43 +38,47 @@ status: produção (Vercel) | pronto para VPS
 
 ---
 
-## API Endpoints (Vercel Serverless / VPS Express)
+## API Endpoints
 
 | Endpoint | Método | Descrição | Auth |
 |----------|--------|-----------|------|
 | `/api/run-agents` | GET/POST | Executa agentes (cron) | x-cron-secret |
 | `/api/manage-agent-cron` | POST | Cria/atualiza/deleta cron jobs | Supabase JWT |
 | `/api/insights-ai` | POST | Gera insights com Gemini | Supabase JWT |
-| `/api/webhook-payment` | POST | Provisiona acesso ao pagar | x-webhook-secret |
+| `/api/meta-callback` | GET | OAuth code flow (server-side) | — |
+| `/api/meta-deletion` | POST | Data deletion callback Meta (App Review) | signed_request HMAC |
 
 ---
 
-## Fluxo de Acesso (Sem cadastro público)
+## Migração de Banco Aplicada
 
+### 2026-06-04 — Multi-conta Meta (`meta_multi_accounts_migration.sql`)
+
+```sql
+-- Adiciona is_active à tabela meta_connections
+ALTER TABLE meta_connections ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+UPDATE meta_connections SET is_active = TRUE WHERE is_active IS NULL;
+ALTER TABLE meta_connections DROP CONSTRAINT IF EXISTS meta_connections_user_id_key;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'meta_connections_user_account_key') THEN
+    ALTER TABLE meta_connections ADD CONSTRAINT meta_connections_user_account_key UNIQUE (user_id, account_id);
+  END IF;
+END $$;
 ```
-Usuário paga plano (Stripe/Hotmart/Kiwify)
-  → plataforma envia webhook para /api/webhook-payment
-  → sistema cria conta Supabase automaticamente
-  → envia e-mail com link para definir senha
-  → usuário acessa gespub.online e entra com e-mail + senha
-```
+
+**Status:** ✅ Aplicado no Supabase em 2026-06-04
 
 ---
 
-## VPS — Quando migrar
+## VPS — Migração
 
-### Quando migrar
-- 200+ usuários ativos
-- Agentes com muitas regras complexas (>10s de execução)
-- Necessidade de cache Redis para Meta API
-- WebSockets para notificações instantâneas
+### Quando migrar para VPS
+- 200+ usuários ativos simultâneos
+- Agentes com execuções complexas (>10s)
+- Cache Redis para Meta API
 
-### Requisitos mínimos de VPS
-- 2 vCPUs, 4GB RAM (ex: Hetzner CX21 — €5/mês)
-- Ubuntu 22.04 LTS
-- Node.js 20+, PM2, Nginx, Certbot
+### Passos de migração
 
-### Migração (passos)
 ```bash
 # 1. No servidor VPS
 git clone https://github.com/dudunike/gespub.git
@@ -81,7 +86,7 @@ cd gespub
 npm install
 npm run build
 
-# 2. Criar .env.production com todas as variáveis
+# 2. Criar arquivo .env com todas as variáveis acima
 
 # 3. Iniciar com PM2
 mkdir -p logs
@@ -95,12 +100,12 @@ sudo certbot --nginx -d gespub.online -d www.gespub.online
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-### Cron no VPS (sem cron-job.org)
+### Atualização após deploy inicial
+
 ```bash
-# Adicionar ao crontab do servidor
-crontab -e
-# Agentes a cada 30 minutos:
-*/30 * * * * curl -s -H "x-cron-secret: SUA_SECRET" https://gespub.online/api/run-agents
+git pull origin main
+npm run build
+pm2 restart gespub-api
 ```
 
 ---
@@ -110,7 +115,7 @@ crontab -e
 ### Públicas
 | Rota | Componente |
 |------|-----------|
-| `/` | Login (somente email+senha, acesso por assinatura) |
+| `/` | Login |
 | `/politica-de-privacidade` | PrivacyPolicy |
 | `/termos-de-uso` | TermsOfUse |
 
@@ -118,17 +123,18 @@ crontab -e
 | Rota | Componente |
 |------|-----------|
 | `/dashboard` | Dashboard (métricas reais Meta) |
-| `/campanhas` | Campaigns (CRUD + insights) |
+| `/campanhas` | Campaigns |
 | `/conjuntos` | AdSets |
-| `/anuncios` | Ads |
-| `/agentes` | Agents (IA automática via cron-job.org) |
+| `/anuncios` | Ads (preview HD, filtros) |
+| `/agentes` | Agents (IA automática) |
 | `/regras` | Rules |
-| `/insights` | Insights (análise Gemini 1.5 Flash) |
-| `/conexoes` | Connections (OAuth Meta redirect) |
+| `/insights` | Insights (Gemini) |
+| `/conexoes` | Connections (múltiplas contas por plano) |
 
 ### Admin
 | Rota | Componente |
 |------|-----------|
 | `/admin` | Overview |
-| `/admin/usuarios` | Users (criar, bloquear, alterar plano) |
+| `/admin/usuarios` | Users |
 | `/admin/logs` | Logs |
+| `/admin/configuracoes` | Settings |
