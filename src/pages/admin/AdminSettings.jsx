@@ -25,23 +25,30 @@ function Section({ title, description, children }) {
 
 const META_TESTS = [
   {
-    id: 'adaccounts',
-    label: 'Contas de anúncios',
-    permissions: 'ads_read, ads_management',
+    id: 'ads_read',
+    label: 'ads_read',
+    description: 'Leitura de contas de anúncios',
     path: '/me/adaccounts',
     params: { fields: 'id,name,account_status', limit: '5' },
   },
   {
-    id: 'pages',
-    label: 'Páginas do Facebook',
-    permissions: 'pages_read_engagement, pages_show_list',
-    path: '/me/accounts',
-    params: { fields: 'id,name', limit: '5' },
+    id: 'ads_management',
+    label: 'ads_management',
+    description: 'Gerenciamento de contas de anúncios',
+    path: '/me/adaccounts',
+    params: { fields: 'id,name,account_status,currency', limit: '5' },
   },
   {
-    id: 'businesses',
-    label: 'Contas Business',
-    permissions: 'business_management',
+    id: 'pages_read_engagement',
+    label: 'pages_read_engagement',
+    description: 'Leitura de engajamento de páginas',
+    path: '/me/accounts',
+    params: { fields: 'id,name,fan_count', limit: '5' },
+  },
+  {
+    id: 'business_management',
+    label: 'business_management',
+    description: 'Gerenciamento de contas Business',
     path: '/me/businesses',
     params: { fields: 'id,name', limit: '5' },
   },
@@ -344,8 +351,8 @@ export default function AdminSettings() {
                                           'bg-surface-bg border-border'
               }`}>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-txt-primary">{test.label}</p>
-                  <p className="text-xs text-txt-secondary">{test.permissions}</p>
+                  <p className="text-sm font-mono font-medium text-txt-primary">{test.label}</p>
+                  <p className="text-xs text-txt-secondary">{test.description}</p>
                   {r?.status === 'ok' && (
                     <p className="text-xs text-status-success mt-1">
                       {r.count} registro(s) retornado(s) — ex: <span className="font-medium">{r.sample}</span>
