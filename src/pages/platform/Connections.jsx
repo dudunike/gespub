@@ -8,6 +8,7 @@ import {
 import Button from '../../components/ui/Button'
 import { useMeta } from '../../context/MetaContext'
 import { useAuth } from '../../context/AuthContext'
+import { supabase } from '../../lib/supabaseClient'
 import { getAdAccounts } from '../../lib/metaApi'
 import { formatDateTime } from '../../utils/formatters'
 import { PLAN_BADGE_VARIANT } from '../../utils/planLimits'
@@ -113,12 +114,11 @@ export default function Connections() {
 
   const [step, setStep]                           = useState('idle')
   const [availableAccounts, setAvailableAccounts] = useState([])
-  const [pendingToken, setPendingToken]           = useState(null)
-  const [localError, setLocalError]               = useState(null)
+const [localError, setLocalError]               = useState(null)
   const [saving, setSaving]                       = useState(false)
   const [processingReturn, setProcessingReturn]   = useState(() => {
     const sp = new URLSearchParams(window.location.search)
-    return !!(sp.get('code') || sp.get('selecting') || sp.get('connected'))
+    return !!(sp.get('code') || sp.get('selecting') || sp.get('connected') || sp.get('select'))
   })
   const [switchingId, setSwitchingId]             = useState(null)
   const [removingId, setRemovingId]               = useState(null)
@@ -136,6 +136,7 @@ export default function Connections() {
     const code      = searchParams.get('code')
     const state     = searchParams.get('state')
     const connected = searchParams.get('connected')
+    const select    = searchParams.get('select')
 
     // Facebook retornou o code — encaminha para o handler server-side.
     // detectSessionInUrl: false no Supabase garante que ele não intercepta este ?code=
@@ -143,6 +144,40 @@ export default function Connections() {
       setProcessingReturn(true)
       const qs = new URLSearchParams({ code, state }).toString()
       window.location.replace(`/api/meta-callback?${qs}`)
+      return
+    }
+
+    // Servidor salvou o token PENDING e quer que o usuário escolha a conta
+    if (select === '1') {
+      window.history.replaceState(null, '', window.location.pathname)
+      setProcessingReturn(true)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.access_token) {
+          setLocalError('Sessão expirada. Faça login novamente.')
+          setProcessingReturn(false)
+          return
+        }
+        fetch('/api/meta-proxy', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: '/pending-accounts' }),
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.error) {
+              setLocalError(data.error)
+              setProcessingReturn(false)
+              return
+            }
+            setAvailableAccounts(data.accounts || [])
+            setStep('selecting')
+            setProcessingReturn(false)
+          })
+          .catch(() => {
+            setLocalError('Erro ao carregar contas. Tente reconectar.')
+            setProcessingReturn(false)
+          })
+      })
       return
     }
 
@@ -279,7 +314,12 @@ export default function Connections() {
         {/* Picker de conta pós-OAuth */}
         {step === 'selecting' && (
           <div className="mt-5 space-y-3">
-            <p className="text-sm font-medium text-txt-primary">Selecione a conta de anúncios:</p>
+            <p className="text-sm font-medium text-txt-primary">Selecione a conta de anúncios para analisar:</p>
+            {availableAccounts.length === 0 && (
+              <p className="text-sm text-txt-secondary py-2">
+                Nenhuma conta de anúncios encontrada neste perfil do Facebook.
+              </p>
+            )}
             {availableAccounts.map((acc) => (
               <button
                 key={acc.id}
@@ -292,7 +332,7 @@ export default function Connections() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-txt-primary truncate">{acc.name}</p>
-                  <p className="text-xs text-txt-secondary font-mono">{acc.account_id}</p>
+                  <p className="text-xs text-txt-secondary font-mono">{acc.account_id || acc.id}</p>
                 </div>
                 <span className="text-xs text-txt-secondary shrink-0">{acc.currency}</span>
                 {saving && <IconLoader2 size={16} className="animate-spin text-brand-500 shrink-0" />}

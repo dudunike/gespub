@@ -142,58 +142,30 @@ export default async function handler(req, res) {
       return redirectTo('/conexoes?error=' + encodeURIComponent('Nenhuma conta de anúncios encontrada neste perfil do Facebook. Verifique se você tem acesso a uma conta de anúncios.'))
     }
 
-    // Busca o plano do usuário via tabela profiles (não users)
-    const { data: profile } = await supabase.from('profiles').select('plan, role').eq('id', user.id).single()
-    const planLimits = { starter: 1, basic: 1, pro: 3, advanced: 5, enterprise: 999 }
-    const isAdmin = profile?.role === 'admin'
-    const limit = isAdmin ? 999 : (planLimits[profile?.plan || 'basic'] || 1)
-
-    // Seleciona as contas até o limite do plano
-    const accountsToConnect = accounts.slice(0, limit)
-
     // Desativa TODAS as conexões atuais do usuário
     await supabase.from('meta_connections').update({ is_active: false }).eq('user_id', user.id)
 
     // Remove PENDING antigo se existir
     await supabase.from('meta_connections').delete().eq('user_id', user.id).eq('account_id', 'PENDING')
 
-    // Salva cada conta, verificando erros explicitamente
-    for (let i = 0; i < accountsToConnect.length; i++) {
-      const account = accountsToConnect[i]
-      const isActive = (i === 0)
+    // Salva registro PENDING com o token — o usuário escolherá a conta na próxima tela
+    const { error: pendingErr } = await supabase.from('meta_connections').insert({
+      user_id:      user.id,
+      access_token: accessToken,
+      account_id:   'PENDING',
+      account_name: 'PENDING',
+      currency:     'BRL',
+      connected_at: new Date().toISOString(),
+      is_active:    false,
+    })
 
-      // Verifica se a conexão já existe
-      const { data: existing } = await supabase.from('meta_connections')
-        .select('id').eq('user_id', user.id).eq('account_id', account.id).maybeSingle()
-
-      if (existing) {
-        const { error: updateErr } = await supabase.from('meta_connections').update({
-          access_token: accessToken,
-          account_name: account.name,
-          currency: account.currency || 'BRL',
-          connected_at: new Date().toISOString(),
-          is_active: isActive
-        }).eq('id', existing.id)
-        if (updateErr) console.error('[meta-callback] Update error:', updateErr.message)
-      } else {
-        const { error: insertErr } = await supabase.from('meta_connections').insert({
-          user_id: user.id,
-          access_token: accessToken,
-          account_id: account.id,
-          account_name: account.name,
-          currency: account.currency || 'BRL',
-          connected_at: new Date().toISOString(),
-          is_active: isActive
-        })
-        if (insertErr) {
-          console.error('[meta-callback] Insert error:', insertErr.message)
-          return redirectTo(`/conexoes?error=${encodeURIComponent('Erro ao salvar conta: ' + insertErr.message)}`)
-        }
-      }
+    if (pendingErr) {
+      console.error('[meta-callback] Erro ao salvar PENDING:', pendingErr.message)
+      return redirectTo(`/conexoes?error=${encodeURIComponent('Erro ao iniciar conexão: ' + pendingErr.message)}`)
     }
 
-    console.log(`[meta-callback] ✅ Conectado: ${user.email} → ${accountsToConnect.length} conta(s) salva(s).`)
-    return redirectTo('/conexoes?connected=1')
+    console.log(`[meta-callback] ✅ Token OAuth salvo: ${user.email} → ${accounts.length} conta(s) disponíveis para seleção.`)
+    return redirectTo('/conexoes?select=1')
 
   } catch (err) {
     console.error('[meta-callback] Unexpected error:', err)

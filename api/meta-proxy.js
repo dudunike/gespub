@@ -52,6 +52,32 @@ export default async function handler(req, res) {
     }
   }
 
+  // Retorna lista de contas disponíveis usando o token do registro PENDING
+  if (path === '/pending-accounts') {
+    const { data: pending } = await supabase
+      .from('meta_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('account_id', 'PENDING')
+      .single()
+
+    if (!pending?.access_token) {
+      return res.status(404).json({ error: 'Nenhuma conexão pendente encontrada. Tente reconectar.' })
+    }
+
+    const accountsRes = await fetch(
+      `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,name,account_id,currency,account_status&limit=50&access_token=${pending.access_token}`
+    )
+    const accountsData = await accountsRes.json()
+
+    if (accountsData.error) {
+      console.error('[meta-proxy] pending-accounts Meta error:', accountsData.error)
+      return res.status(400).json({ error: accountsData.error.message || 'Erro ao buscar contas no Facebook' })
+    }
+
+    return res.status(200).json({ accounts: accountsData.data || [] })
+  }
+
   if (path === '/add-account') {
     // 2. Verifica Limite de Contas no Servidor (bypass prevention)
     const [ { data: profile }, { data: existingConns }, { data: settings } ] = await Promise.all([
