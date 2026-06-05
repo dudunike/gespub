@@ -17,7 +17,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
-  const { code, state, error: fbError, error_description, redirect_uri: explicitRedirectUri } = req.query
+  const { code, state, error: fbError, error_description } = req.query
 
   // Dados padrão de retorno
   let returnBase = 'https://www.gespub.online'
@@ -97,11 +97,13 @@ export default async function handler(req, res) {
     return redirectTo('/conexoes?error=App Secret não configurado no servidor')
   }
 
-  // O redirect_uri precisa ser EXATAMENTE o mesmo usado no redirect inicial
-  // Normaliza www → non-www para casar com o URI cadastrado no app Meta
+  // O redirect_uri deve ser EXATAMENTE o que está cadastrado no app Meta
+  // e o mesmo enviado no início do fluxo OAuth (MetaContext.jsx)
   const rawOrigin = stateData.o || `https://${req.headers.host}`
-  const origin = rawOrigin
-  const redirectUri = explicitRedirectUri || `${origin}/api/meta-callback`
+  const normalizedOrigin = rawOrigin.replace('https://www.', 'https://')
+  const redirectUri = normalizedOrigin.startsWith('http://localhost')
+    ? `${normalizedOrigin}/conexoes`
+    : 'https://gespub.online/conexoes'
 
   try {
     // ── Troca o code por access_token ──────────────────────────────────────

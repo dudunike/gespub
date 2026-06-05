@@ -127,36 +127,42 @@ export default function Connections() {
   useEffect(() => {
     if (loadingConnection) return
     const searchParams = new URLSearchParams(window.location.search)
-    const connected = searchParams.get('connected')
-    const errCode = searchParams.get('error')
-    const code = searchParams.get('code')
-    const state = searchParams.get('state')
-    const selecting = searchParams.get('selecting')
-    
+    const connected   = searchParams.get('connected')
+    const errCode     = searchParams.get('error')
+    const code        = searchParams.get('code')
+    const state       = searchParams.get('state')
+    const selecting   = searchParams.get('selecting')
+
+    // Facebook retornou o code — encaminha para o handler server-side
     if (code && state) {
-      window.location.href = `/api/meta-callback?code=${code}&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent('https://gespub.online/conexoes')}`
+      setProcessingReturn(true)
+      const qs = new URLSearchParams({ code, state }).toString()
+      window.location.replace(`/api/meta-callback?${qs}`)
       return
     }
 
+    // Server salvou PENDING e redirecionou aqui — busca contas disponíveis
     if (selecting) {
       window.history.replaceState(null, '', window.location.pathname)
-      setStep('selecting')
+      setProcessingReturn(true)
       getAdAccounts()
         .then(accs => {
-          if (!accs.length) { setLocalError('Nenhuma conta de anúncios encontrada.'); return }
+          if (!accs.length) {
+            setLocalError('Nenhuma conta de anúncios encontrada no Facebook.')
+            return
+          }
           setAvailableAccounts(accs)
+          setStep('selecting')
         })
         .catch(err => setLocalError(err.message))
+        .finally(() => setProcessingReturn(false))
       return
     }
 
     if (connected || errCode || window.location.hash.includes('access_token')) {
       window.history.replaceState(null, '', window.location.pathname)
     }
-
-    if (errCode) {
-      setLocalError(errCode)
-    }
+    if (errCode) setLocalError(errCode)
   }, [loadingConnection])
 
   const handleAddAccount = async () => {
