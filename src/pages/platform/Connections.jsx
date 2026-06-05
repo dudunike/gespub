@@ -134,7 +134,7 @@ export default function Connections() {
     const selecting = searchParams.get('selecting')
     
     if (code && state) {
-      window.location.href = `/api/meta-callback?code=${code}&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(window.location.origin + '/conexoes')}`
+      window.location.href = `/api/meta-callback?code=${code}&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent('https://gespub.online/conexoes')}`
       return
     }
 
