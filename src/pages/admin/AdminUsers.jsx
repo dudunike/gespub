@@ -343,26 +343,21 @@ export default function AdminUsers() {
   }
 
   const handleCreateUser = async (form) => {
-    // Cria usuário no Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email:    form.email,
-      password: form.password,
-      options:  { data: { name: form.name } },
-    })
-    if (error) throw new Error(error.message)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
 
-    if (data?.user) {
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id:              data.user.id,
-        name:            form.name,
-        role:            'user',
-        plan:            form.plan,
-        status:          form.status,
-        plan_start_at:   form.plan_start_at   || null,
-        plan_expires_at: form.plan_expires_at || null,
-      })
-      if (profileError) throw new Error(profileError.message)
-    }
+    const res = await fetch('/api/admin-create-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ form })
+    })
+
+    const result = await res.json()
+    if (!res.ok) throw new Error(result.error || 'Erro desconhecido ao criar usuário.')
+
     await loadUsers()
   }
 
