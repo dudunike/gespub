@@ -54,9 +54,11 @@ function StatusChip({ status }) {
 function AdPreview({ url, type, name, size = 'full' }) {
   const [err, setErr] = useState(false)
   const isSmall = size === 'sm'
+  // Full: aspect-video (16:9) com fundo preto — imagens Meta são geralmente 1.91:1 ou 1:1.
+  // object-contain evita esticar/borrar; object-cover apenas no thumb pequeno.
   const cls = isSmall
-    ? 'w-14 h-14 rounded-lg shrink-0 overflow-hidden'
-    : 'w-full aspect-square overflow-hidden bg-surface-bg'
+    ? 'w-14 h-14 rounded-lg shrink-0 overflow-hidden bg-gray-100'
+    : 'w-full aspect-video overflow-hidden bg-gray-950'
 
   const gradients = {
     image:    'from-violet-500 to-purple-700',
@@ -66,19 +68,26 @@ function AdPreview({ url, type, name, size = 'full' }) {
   const grad = gradients[type] || gradients.image
 
   if (url && !err) {
+    const imgCls = isSmall
+      ? 'w-full h-full object-cover'
+      : type === 'video'
+        ? 'w-full h-full object-cover'
+        : 'w-full h-full object-contain'
+
     return (
       <div className={`relative ${cls}`}>
         <img
           src={url}
           alt={name}
-          className="w-full h-full object-cover"
+          className={imgCls}
           loading="lazy"
+          decoding="async"
           onError={() => setErr(true)}
         />
         {type === 'video' && !isSmall && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-            <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-xl">
-              <IconPlayerPlay size={22} className="text-brand-500 ml-1" fill="currentColor" />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-xl">
+              <IconPlayerPlay size={20} className="text-brand-500 ml-1" fill="currentColor" />
             </div>
           </div>
         )}
