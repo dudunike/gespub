@@ -27,7 +27,7 @@ async function loadRoute(name) {
 
 // Registra cada rota de API
 async function registerRoutes() {
-  const routes = ['run-agents', 'manage-agent-cron', 'insights-ai', 'meta-deletion', 'meta-callback']
+  const routes = ['run-agents', 'manage-agent-cron', 'insights-ai', 'meta-deletion', 'meta-callback', 'meta-proxy']
 
   for (const name of routes) {
     try {

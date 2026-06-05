@@ -54,7 +54,11 @@ export default async function handler(req, res) {
     secret = whConfig.value.secret
   }
 
-  if (secret && req.headers['x-webhook-secret'] !== secret) {
+  if (!secret) {
+    return res.status(503).json({ error: 'Webhook não configurado no painel admin' })
+  }
+
+  if (req.headers['x-webhook-secret'] !== secret) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 

@@ -13,6 +13,13 @@ ALTER TABLE meta_connections
   DROP CONSTRAINT IF EXISTS meta_connections_user_id_key;
 
 -- 4. Adiciona constraint UNIQUE em (user_id, account_id) — 1 registro por conta por usuário
-ALTER TABLE meta_connections
-  ADD CONSTRAINT IF NOT EXISTS meta_connections_user_account_key
-  UNIQUE (user_id, account_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'meta_connections_user_account_key'
+  ) THEN
+    ALTER TABLE meta_connections
+      ADD CONSTRAINT meta_connections_user_account_key
+      UNIQUE (user_id, account_id);
+  END IF;
+END $$;

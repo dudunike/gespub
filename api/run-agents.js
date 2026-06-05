@@ -18,9 +18,10 @@ const META_BASE = 'https://graph.facebook.com/v21.0'
 
 async function metaGet(path, token, params = {}) {
   const url = new URL(`${META_BASE}${path}`)
-  url.searchParams.set('access_token', token)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
-  const res = await fetch(url.toString())
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` }
+  })
   const data = await res.json()
   if (data.error) {
     const code = data.error.code
@@ -305,12 +306,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const cronSecret  = process.env.CRON_SECRET || 'gespub-cron-2026'
+  const cronSecret  = process.env.CRON_SECRET
+  if (!cronSecret) {
+    console.error('[run-agents] CRON_SECRET não configurado')
+    return res.status(500).json({ error: 'Configuração do servidor incompleta' })
+  }
+
   const fromVercel  = req.headers['x-vercel-cron'] === '1'                  // Vercel Cron nativo
   const fromExternal = req.headers['x-cron-secret'] === cronSecret          // pg_cron / externo
-  const fromQuery   = req.query?.secret === cronSecret                       // query param fallback
 
-  if (!fromVercel && !fromExternal && !fromQuery) {
+  if (!fromVercel && !fromExternal) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 

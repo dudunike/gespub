@@ -1,31 +1,30 @@
 // Meta Graph API — leitura e edição de campanhas, conjuntos e anúncios
 
-const BASE = 'https://graph.facebook.com/v21.0'
+import { supabase } from './supabaseClient'
 
-async function apiFetch(path, token, params = {}, method = 'GET', body = null) {
-  const url = new URL(`${BASE}${path}`)
-  if (method === 'GET') {
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
-  }
+async function apiFetch(path, params = {}, method = 'GET', body = null) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Usuário não autenticado')
 
-  const options = {
-    method,
-    headers: { Authorization: `Bearer ${token}` },
-  }
-  if (body && method !== 'GET') {
-    options.headers['Content-Type'] = 'application/json'
-    options.body = JSON.stringify(body)
-  }
+  const res = await fetch('/api/meta-proxy', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({ path, params, method, body })
+  })
 
-  const res = await fetch(url.toString(), options)
   const data = await res.json()
 
-  if (data.error) {
+  if (data.error && data.error.message) {
     const msg = data.error.message || 'Erro desconhecido na Meta API'
     const code = data.error.code
     if (code === 190) throw new Error('Token expirado. Reconecte sua conta Meta.')
     if (code === 100) throw new Error(`Parâmetro inválido: ${msg}`)
     throw new Error(`Meta API (${code}): ${msg}`)
+  } else if (data.error) {
+    throw new Error(data.error)
   }
   return data
 }
@@ -33,9 +32,9 @@ async function apiFetch(path, token, params = {}, method = 'GET', body = null) {
 // ---------- VALIDAÇÃO DE TOKEN ----------
 
 // Verifica se o token ainda é válido consultando /me
-export async function checkTokenValid(token) {
+export async function checkTokenValid() {
   try {
-    await apiFetch('/me', token, { fields: 'id' })
+    await apiFetch('/me', { fields: 'id' })
     return true
   } catch {
     return false
@@ -44,8 +43,8 @@ export async function checkTokenValid(token) {
 
 // ---------- CONTAS DE ANÚNCIOS ----------
 
-export async function getAdAccounts(token) {
-  const data = await apiFetch('/me/adaccounts', token, {
+export async function getAdAccounts() {
+  const data = await apiFetch('/me/adaccounts', {
     fields: 'id,name,account_id,currency,account_status,business',
     limit: 50,
   })
@@ -54,8 +53,8 @@ export async function getAdAccounts(token) {
 
 // ---------- CAMPANHAS ----------
 
-export async function getCampaigns(accountId, token) {
-  const data = await apiFetch(`/${accountId}/campaigns`, token, {
+export async function getCampaigns(accountId) {
+  const data = await apiFetch(`/${accountId}/campaigns`, {
     fields: 'id,name,status,effective_status,objective,daily_budget,lifetime_budget,start_time,stop_time,created_time',
     limit: 200,
   })
@@ -71,7 +70,7 @@ function dateParams(datePreset, timeRange) {
 }
 
 // Insights de campanhas (métricas reais, últimos 30 dias por padrão)
-export async function getCampaignInsights(accountId, token, datePreset = 'last_30d', timeRange = null) {
+export async function getCampaignInsights(accountId, datePreset = 'last_30d', timeRange = null) {
   const fields = [
     'campaign_id',
     'campaign_name',
@@ -88,7 +87,7 @@ export async function getCampaignInsights(accountId, token, datePreset = 'last_3
     'cost_per_action_type',
   ].join(',')
 
-  const data = await apiFetch(`/${accountId}/insights`, token, {
+  const data = await apiFetch(`/${accountId}/insights`, {
     fields,
     level: 'campaign',
     ...dateParams(datePreset, timeRange),
@@ -98,29 +97,29 @@ export async function getCampaignInsights(accountId, token, datePreset = 'last_3
 }
 
 // Pausar ou ativar campanha
-export async function updateCampaignStatus(campaignId, token, status) {
-  return apiFetch(`/${campaignId}`, token, {}, 'POST', { status })
+export async function updateCampaignStatus(campaignId, status) {
+  return apiFetch(`/${campaignId}`, {}, 'POST', { status })
 }
 
 // Atualizar orçamento diário de campanha (valor em centavos da moeda local)
-export async function updateCampaignBudget(campaignId, token, dailyBudgetCents) {
-  return apiFetch(`/${campaignId}`, token, {}, 'POST', {
+export async function updateCampaignBudget(campaignId, dailyBudgetCents) {
+  return apiFetch(`/${campaignId}`, {}, 'POST', {
     daily_budget: String(dailyBudgetCents),
   })
 }
 
 // ---------- CONJUNTOS DE ANÚNCIOS ----------
 
-export async function getAdSets(accountId, token, campaignId = null) {
+export async function getAdSets(accountId, campaignId = null) {
   const path = campaignId ? `/${campaignId}/adsets` : `/${accountId}/adsets`
-  const data = await apiFetch(path, token, {
+  const data = await apiFetch(path, {
     fields: 'id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,created_time',
     limit: 200,
   })
   return data.data || []
 }
 
-export async function getAdSetInsights(accountId, token, datePreset = 'last_30d', timeRange = null) {
+export async function getAdSetInsights(accountId, datePreset = 'last_30d', timeRange = null) {
   const fields = [
     'adset_id',
     'adset_name',
@@ -138,7 +137,7 @@ export async function getAdSetInsights(accountId, token, datePreset = 'last_30d'
     'action_values',
   ].join(',')
 
-  const data = await apiFetch(`/${accountId}/insights`, token, {
+  const data = await apiFetch(`/${accountId}/insights`, {
     fields,
     level: 'adset',
     ...dateParams(datePreset, timeRange),
@@ -147,20 +146,20 @@ export async function getAdSetInsights(accountId, token, datePreset = 'last_30d'
   return data.data || []
 }
 
-export async function updateAdSetStatus(adSetId, token, status) {
-  return apiFetch(`/${adSetId}`, token, {}, 'POST', { status })
+export async function updateAdSetStatus(adSetId, status) {
+  return apiFetch(`/${adSetId}`, {}, 'POST', { status })
 }
 
-export async function updateAdSetBudget(adSetId, token, dailyBudgetCents) {
-  return apiFetch(`/${adSetId}`, token, {}, 'POST', {
+export async function updateAdSetBudget(adSetId, dailyBudgetCents) {
+  return apiFetch(`/${adSetId}`, {}, 'POST', {
     daily_budget: String(dailyBudgetCents),
   })
 }
 
 // ---------- ANÚNCIOS ----------
 
-export async function getAds(accountId, token) {
-  const data = await apiFetch(`/${accountId}/ads`, token, {
+export async function getAds(accountId) {
+  const data = await apiFetch(`/${accountId}/ads`, {
     fields: 'id,name,status,effective_status,adset_id,campaign_id,created_time',
     limit: 200,
   })
@@ -168,7 +167,7 @@ export async function getAds(accountId, token) {
 }
 
 // Busca anúncios com criativos (thumbnail, imagem, vídeo, tipo)
-export async function getAdsWithCreatives(accountId, token) {
+export async function getAdsWithCreatives(accountId) {
   const creativeFields = [
     'thumbnail_url',
     'image_url',
@@ -180,14 +179,14 @@ export async function getAdsWithCreatives(accountId, token) {
     'object_story_spec',
   ].join(',')
 
-  const data = await apiFetch(`/${accountId}/ads`, token, {
+  const data = await apiFetch(`/${accountId}/ads`, {
     fields: `id,name,status,effective_status,adset_id,adset{name},campaign_id,campaign{name},created_time,creative{${creativeFields}}`,
     limit: 200,
   })
   return data.data || []
 }
 
-export async function getAdInsights(accountId, token, datePreset = 'last_30d', timeRange = null) {
+export async function getAdInsights(accountId, datePreset = 'last_30d', timeRange = null) {
   const fields = [
     'ad_id',
     'ad_name',
@@ -207,7 +206,7 @@ export async function getAdInsights(accountId, token, datePreset = 'last_30d', t
     'action_values',
   ].join(',')
 
-  const data = await apiFetch(`/${accountId}/insights`, token, {
+  const data = await apiFetch(`/${accountId}/insights`, {
     fields,
     level: 'ad',
     ...dateParams(datePreset, timeRange),
@@ -216,16 +215,16 @@ export async function getAdInsights(accountId, token, datePreset = 'last_30d', t
   return data.data || []
 }
 
-export async function updateAdStatus(adId, token, status) {
-  return apiFetch(`/${adId}`, token, {}, 'POST', { status })
+export async function updateAdStatus(adId, status) {
+  return apiFetch(`/${adId}`, {}, 'POST', { status })
 }
 
 // ---------- HELPERS ----------
 
 // Seguidores reais: páginas Facebook + Instagram Business vinculado
-export async function getPageFollowers(token) {
+export async function getPageFollowers() {
   try {
-    const data = await apiFetch('/me/accounts', token, {
+    const data = await apiFetch('/me/accounts', {
       fields: 'id,name,fan_count,instagram_business_account{id,username,followers_count}',
       limit: 10,
     })

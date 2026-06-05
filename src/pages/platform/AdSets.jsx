@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   IconRefresh, IconPlayerPlay, IconPlayerPause,
   IconEdit, IconExternalLink, IconAlertCircle,
-  IconPlugConnected,
+  IconPlugConnected, IconChevronUp, IconChevronDown
 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
@@ -75,7 +75,7 @@ function BudgetModal({ adSet, onSave, onClose }) {
 
 export default function AdSets() {
   const navigate = useNavigate()
-  const { isConnected, accessToken, accountId, accountName, loadingConnection } = useMeta()
+  const { isConnected, accessToken, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
 
   const [adSets,     setAdSets]     = useState([])
   const [insights,   setInsights]   = useState({})   // adset_id → insight
@@ -87,27 +87,34 @@ export default function AdSets() {
   const [timeRange,      setTimeRange]      = useState(null)
   const [editingBudget,  setEditingBudget]  = useState(null)
   const [toggling,       setToggling]       = useState({})
+  const [sortField, setSortField] = useState('spend')
+  const [sortDirection, setSortDirection] = useState('desc')
 
   const loadData = useCallback(async () => {
-    if (!isConnected || !accessToken || !accountId) return
+    if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true); setError(null)
     try {
-      const [rawAdSets, rawInsights, rawCampaigns] = await Promise.all([
-        getAdSets(accountId, accessToken),
-        getAdSetInsights(accountId, accessToken, datePreset, timeRange),
-        getCampaigns(accountId, accessToken),
-      ])
-      setAdSets(rawAdSets)
-      setCampaigns(rawCampaigns)
+      const allAdSetsRaw = await Promise.all(activeAccounts.map(acc => getAdSets(acc.account_id, accessToken)))
+      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getAdSetInsights(acc.account_id, accessToken, datePreset, timeRange)))
+      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id, accessToken)))
+
+      const mergedAdSets = []
+      allAdSetsRaw.forEach((arr, i) => {
+        arr.forEach(a => mergedAdSets.push({ ...a, __account_name: activeAccounts[i].account_name, __account_id: activeAccounts[i].account_id }))
+      })
+      
+      setAdSets(mergedAdSets)
+      setCampaigns(allCampaignsRaw.flat())
+      
       const idx = {}
-      rawInsights.forEach(i => { idx[i.adset_id] = i })
+      allInsightsRaw.flat().forEach(i => { idx[i.adset_id] = i })
       setInsights(idx)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, accountId, datePreset, timeRange])
+  }, [isConnected, accessToken, activeAccounts, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -130,10 +137,55 @@ export default function AdSets() {
     } catch (err) { setError(err.message) }
   }
 
-  // Filtra por campanha
   const filtered = campaignFilter
     ? adSets.filter(a => a.campaign_id === campaignFilter)
     : adSets
+
+  const prepared = filtered.map(adSet => {
+    const ins    = insights[adSet.id] || {}
+    const status = adSet.effective_status || adSet.status
+    const budget = adSet.daily_budget ? Number(adSet.daily_budget) / 100 : 0
+    const spend      = Number(ins.spend       || 0)
+    const reach      = Number(ins.reach       || 0)
+    const impressions= Number(ins.impressions || 0)
+    const ctr        = Number(ins.ctr         || 0)
+    const cpc        = Number(ins.cpc         || 0)
+    const frequency  = Number(ins.frequency   || 0)
+    const cpm        = Number(ins.cpm         || 0)
+    const purchases  = getActionCount(ins.actions, 'purchase')
+    const whatsapp   = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
+    const leads      = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
+    const totalConvs = purchases + whatsapp + leads
+    const cpa        = spend > 0 && totalConvs > 0 ? spend / totalConvs : 0
+
+    return { ...adSet, status, budget, spend, reach, impressions, ctr, cpc, frequency, cpm, purchases, whatsapp, leads, totalConvs, cpa }
+  })
+
+  prepared.sort((a, b) => {
+    let valA = a[sortField] ?? 0
+    let valB = b[sortField] ?? 0
+    if (typeof valA === 'string') valA = valA.toLowerCase()
+    if (typeof valB === 'string') valB = valB.toLowerCase()
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1
+    return 0
+  })
+
+  const tSpend = prepared.reduce((s, c) => s + c.spend, 0)
+  const tImp = prepared.reduce((s, c) => s + c.impressions, 0)
+  const tReach = prepared.reduce((s, c) => s + c.reach, 0)
+  const tConv = prepared.reduce((s, c) => s + c.totalConvs, 0)
+  const tCpa = tConv > 0 ? tSpend / tConv : 0
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDirection('desc') }
+  }
+
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? <IconChevronUp size={14} className="ml-1 inline" /> : <IconChevronDown size={14} className="ml-1 inline" />
+  }
 
   const campaignOptions = campaigns.map(c => ({ id: c.id, label: c.name }))
 
@@ -158,11 +210,22 @@ export default function AdSets() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          {accountName && (
+          {connections.length > 1 ? (
+            <Select
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              className="w-48 !py-1.5"
+              options={[
+                { id: 'active', label: 'Conta Ativa' },
+                { id: 'all', label: `Todas as contas (${connections.length})` },
+                ...connections.map(c => ({ id: c.account_id, label: c.account_name }))
+              ]}
+            />
+          ) : connections.length === 1 ? (
             <span className="text-xs text-txt-secondary bg-surface-bg px-2.5 py-1 rounded-full border border-border">
-              {accountName}
+              {connections[0].account_name}
             </span>
-          )}
+          ) : null}
           {/* Filtro por campanha */}
           {campaigns.length > 0 && (
             <Select
@@ -210,34 +273,30 @@ export default function AdSets() {
           <table className="w-full min-w-[960px]">
             <thead>
               <tr className="border-b border-border bg-surface-bg">
-                {['Nome', 'Campanha', 'Orç. diário', 'Investido', 'Alcance', 'Impressões', 'CTR', 'CPC', 'Conversões', 'CPA', 'Frequência', 'CPM', 'Status', 'Ações'].map(h => (
-                  <th key={h} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                {[
+                  { k: 'name', l: 'Nome' }, { k: 'campaign_id', l: 'Campanha' }, { k: 'budget', l: 'Orç. diário' },
+                  { k: 'spend', l: 'Investido' }, { k: 'reach', l: 'Alcance' }, { k: 'impressions', l: 'Impressões' },
+                  { k: 'ctr', l: 'CTR' }, { k: 'cpc', l: 'CPC' }, { k: 'totalConvs', l: 'Conversões' },
+                  { k: 'cpa', l: 'CPA' }, { k: 'frequency', l: 'Frequência' }, { k: 'cpm', l: 'CPM' }, { k: 'status', l: 'Status' }
+                ].map((col) => (
+                  <th key={col.k} onClick={() => handleSort(col.k)} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-txt-primary">
+                    {col.l} <SortIcon field={col.k} />
+                  </th>
                 ))}
+                <th className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((adSet) => {
-                const ins    = insights[adSet.id] || {}
-                const status = adSet.effective_status || adSet.status
-                const isActive = status === 'ACTIVE'
-                const budget = adSet.daily_budget ? Number(adSet.daily_budget) / 100 : null
-                const spend      = Number(ins.spend       || 0)
-                const reach      = Number(ins.reach       || 0)
-                const impressions= Number(ins.impressions || 0)
-                const ctr        = Number(ins.ctr         || 0)
-                const cpc        = Number(ins.cpc         || 0)
-                const frequency  = Number(ins.frequency   || 0)
-                const cpm        = Number(ins.cpm         || 0)
-                const purchases  = getActionCount(ins.actions, 'purchase')
-                const whatsapp   = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
-                const leads      = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
-                const totalConvs = purchases + whatsapp + leads
-                const cpa        = spend > 0 && totalConvs > 0 ? spend / totalConvs : 0
+              {prepared.map((adSet) => {
+                const isActive = adSet.status === 'ACTIVE'
 
                 return (
                   <tr key={adSet.id} className="border-b border-border last:border-0 hover:bg-surface-bg/50 transition-colors">
                     <td className="px-4 py-3 max-w-[200px]">
                       <p className="text-sm font-medium text-txt-primary truncate">{adSet.name}</p>
+                      {selectedAccountId === 'all' && (
+                        <p className="text-[10px] text-brand-500 font-medium truncate mt-0.5">{adSet.__account_name}</p>
+                      )}
                       <p className="text-xs text-txt-secondary font-mono">{adSet.id}</p>
                     </td>
                     <td className="px-4 py-3 max-w-[180px]">
@@ -246,68 +305,68 @@ export default function AdSets() {
                       </p>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {budget ? (
+                      {adSet.budget ? (
                         <button
                           onClick={() => setEditingBudget(adSet)}
                           className="flex items-center gap-1 text-sm font-medium text-txt-primary hover:text-brand-500 transition-colors group"
                           title="Clique para editar"
                         >
-                          {formatCurrency(budget)}
+                          {formatCurrency(adSet.budget)}
                           <IconEdit size={12} className="opacity-0 group-hover:opacity-100" />
                         </button>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-txt-primary whitespace-nowrap">
-                      {spend > 0 ? formatCurrency(spend) : '—'}
+                      {adSet.spend > 0 ? formatCurrency(adSet.spend) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {reach > 0 ? formatNumber(reach) : '—'}
+                      {adSet.reach > 0 ? formatNumber(adSet.reach) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {impressions > 0 ? formatNumber(impressions) : '—'}
+                      {adSet.impressions > 0 ? formatNumber(adSet.impressions) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      {ctr > 0 ? (
-                        <span className={ctr > 3 ? 'text-status-success font-medium' : 'text-txt-primary'}>
-                          {formatPercent(ctr)}
+                      {adSet.ctr > 0 ? (
+                        <span className={adSet.ctr > 3 ? 'text-status-success font-medium' : 'text-txt-primary'}>
+                          {formatPercent(adSet.ctr)}
                         </span>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {cpc > 0 ? formatCurrency(cpc) : '—'}
+                      {adSet.cpc > 0 ? formatCurrency(adSet.cpc) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {totalConvs > 0 ? (
+                      {adSet.totalConvs > 0 ? (
                         <div>
-                          <span className="font-medium">{formatNumber(totalConvs)}</span>
+                          <span className="font-medium">{formatNumber(adSet.totalConvs)}</span>
                           <p className="text-[10px] text-txt-secondary leading-tight">
-                            {[purchases > 0 && `${purchases} compra${purchases !== 1 ? 's' : ''}`,
-                              whatsapp  > 0 && `${whatsapp} WhatsApp`,
-                              leads     > 0 && `${leads} lead${leads !== 1 ? 's' : ''}`
+                            {[adSet.purchases > 0 && `${adSet.purchases} compra${adSet.purchases !== 1 ? 's' : ''}`,
+                              adSet.whatsapp  > 0 && `${adSet.whatsapp} WhatsApp`,
+                              adSet.leads     > 0 && `${adSet.leads} lead${adSet.leads !== 1 ? 's' : ''}`
                             ].filter(Boolean).join(' · ')}
                           </p>
                         </div>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      {cpa > 0 ? (
-                        <span className={`font-semibold ${cpa > 50 ? 'text-status-error' : cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
-                          {formatCurrency(cpa)}
+                      {adSet.cpa > 0 ? (
+                        <span className={`font-semibold ${adSet.cpa > 50 ? 'text-status-error' : adSet.cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
+                          {formatCurrency(adSet.cpa)}
                         </span>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      {frequency > 0 ? (
-                        <span className={frequency > 3 ? 'text-status-warning font-medium' : 'text-txt-primary'}>
-                          {frequency.toFixed(1)}×
+                      {adSet.frequency > 0 ? (
+                        <span className={adSet.frequency > 3 ? 'text-status-warning font-medium' : 'text-txt-primary'}>
+                          {adSet.frequency.toFixed(1)}×
                         </span>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {cpm > 0 ? formatCurrency(cpm) : '—'}
+                      {adSet.cpm > 0 ? formatCurrency(adSet.cpm) : '—'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <StatusChip status={status} />
+                      <StatusChip status={adSet.status} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1">
@@ -339,7 +398,7 @@ export default function AdSets() {
                         </button>
                         {/* Abrir no Gerenciador */}
                         <a
-                          href={`https://business.facebook.com/adsmanager/manage/adsets?act=${accountId?.replace('act_', '')}&selected_adset_ids=${adSet.id}`}
+                          href={`https://business.facebook.com/adsmanager/manage/adsets?act=${(adSet.__account_id || selectedAccountId)?.replace('act_', '')}&selected_adset_ids=${adSet.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           title="Abrir no Gerenciador de Anúncios"
@@ -353,6 +412,24 @@ export default function AdSets() {
                 )
               })}
             </tbody>
+            <tfoot className="bg-surface-bg border-t border-border">
+              <tr>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">Totais ({prepared.length})</td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tReach)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tImp)}</td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpa)}</td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3"></td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>

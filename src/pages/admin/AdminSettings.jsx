@@ -24,6 +24,7 @@ function Section({ title, description, children }) {
 
 export default function AdminSettings() {
   const [plans, setPlans] = useState([
+    { ...PLAN_LIMITS.starter },
     { ...PLAN_LIMITS.basic },
     { ...PLAN_LIMITS.pro },
     { ...PLAN_LIMITS.advanced },
@@ -53,6 +54,7 @@ export default function AdminSettings() {
         const dbPlans = getVal('plan_limits', null)
         if (dbPlans) {
           setPlans([
+            { ...PLAN_LIMITS.starter, ...dbPlans.starter },
             { ...PLAN_LIMITS.basic, ...dbPlans.basic },
             { ...PLAN_LIMITS.pro, ...dbPlans.pro },
             { ...PLAN_LIMITS.advanced, ...dbPlans.advanced },
@@ -78,11 +80,13 @@ export default function AdminSettings() {
     
   const savePlans = async () => {
     const plansObj = {
+      starter: plans.find(p => p.id === 'starter'),
       basic: plans.find(p => p.id === 'basic'),
       pro: plans.find(p => p.id === 'pro'),
       advanced: plans.find(p => p.id === 'advanced')
     }
     await saveSetting('plan_limits', plansObj)
+    Object.assign(PLAN_LIMITS.starter, plansObj.starter)
     Object.assign(PLAN_LIMITS.basic, plansObj.basic)
     Object.assign(PLAN_LIMITS.pro, plansObj.pro)
     Object.assign(PLAN_LIMITS.advanced, plansObj.advanced)

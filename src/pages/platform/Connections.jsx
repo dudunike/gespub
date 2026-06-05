@@ -123,38 +123,42 @@ export default function Connections() {
   const plan       = user?.plan || 'basic'
   const isUnlimited = accountsLimit >= 999 || isAdmin
 
-  // Detecta retorno do Facebook OAuth (token no hash)
+  // Detecta retorno do Facebook OAuth
   useEffect(() => {
     if (loadingConnection) return
-    const hash = window.location.hash
-    if (!hash || !hash.includes('access_token')) return
+    const searchParams = new URLSearchParams(window.location.search)
+    const connected = searchParams.get('connected')
+    const errCode = searchParams.get('error')
+    
+    if (connected || errCode || window.location.hash.includes('access_token')) {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
 
-    const params  = new URLSearchParams(hash.slice(1))
-    const token   = params.get('access_token')
-    const errCode = params.get('error')
-    window.history.replaceState(null, '', window.location.pathname)
+    if (errCode) {
+      setLocalError(errCode)
+    }
+  }, [loadingConnection])
 
-    if (errCode) { setLocalError('Autorização negada no Facebook. Tente novamente.'); return }
-    if (!token) return
-
-    setProcessingReturn(true)
-    getAdAccounts(token)
-      .then((accounts) => {
-        if (!accounts.length) { setLocalError('Nenhuma conta de anúncios encontrada neste perfil.'); return }
-        if (accounts.length === 1) return saveConnection(token, accounts[0])
-        setPendingToken(token)
-        setAvailableAccounts(accounts)
-        setStep('selecting')
-      })
-      .catch((err) => setLocalError(err.message))
-      .finally(() => setProcessingReturn(false))
-  }, [loadingConnection, saveConnection])
+  const handleAddAccount = async () => {
+    if (connections.length === 0) return startConnectRedirect()
+    setSaving(true); setLocalError(null)
+    try {
+      const accounts = await getAdAccounts()
+      if (!accounts.length) { setLocalError('Nenhuma conta de anúncios encontrada.'); return }
+      setAvailableAccounts(accounts)
+      setStep('selecting')
+    } catch (err) {
+      setLocalError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleSelectAccount = async (account) => {
     setSaving(true); setLocalError(null)
     try {
-      await saveConnection(pendingToken, account)
-      setStep('idle'); setAvailableAccounts([]); setPendingToken(null)
+      await saveConnection(account)
+      setStep('idle'); setAvailableAccounts([])
     } catch (err) {
       setLocalError(err.message)
     } finally { setSaving(false) }
@@ -290,7 +294,7 @@ export default function Connections() {
             <div className="flex flex-wrap items-center gap-2 pt-1">
               {/* Pode adicionar mais */}
               {canAddAccount && (
-                <Button variant="secondary" size="sm" icon={IconPlus} onClick={startConnectRedirect}>
+                <Button variant="secondary" size="sm" icon={IconPlus} onClick={handleAddAccount}>
                   Adicionar conta Meta
                 </Button>
               )}

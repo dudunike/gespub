@@ -56,17 +56,29 @@ async function cronRequest(method, path, body = null) {
 // Cria um cron job para o agente
 async function createCronJob(agentId, agentName, frequency) {
   const baseUrl  = process.env.CRONJOB_BASE_URL || 'https://gespub.online'
-  const secret   = process.env.CRON_SECRET || 'gespub-cron-2026'
-  const url      = `${baseUrl}/api/run-agents?agentId=${agentId}&secret=${secret}`
+  const secret   = process.env.CRON_SECRET
+  if (!secret) {
+    console.warn('[manage-agent-cron] CRON_SECRET não configurado')
+  }
+
+  const url      = `${baseUrl}/api/run-agents?agentId=${agentId}`
+  
+  const jobConfig = {
+    url,
+    enabled:       true,
+    saveResponses: false,
+    title:         `GesPub — ${agentName}`,
+    schedule:      freqToSchedule(frequency),
+  }
+
+  if (secret) {
+    jobConfig.extendedData = {
+      headers: { 'x-cron-secret': secret }
+    }
+  }
 
   const data = await cronRequest('PUT', '/cronjobs', {
-    job: {
-      url,
-      enabled:       true,
-      saveResponses: false,
-      title:         `GesPub — ${agentName}`,
-      schedule:      freqToSchedule(frequency),
-    },
+    job: jobConfig,
   })
   return data.jobId
 }

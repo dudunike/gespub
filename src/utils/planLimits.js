@@ -1,6 +1,19 @@
 // Sistema de planos e limites GESPUB.AI
 
 export const PLAN_LIMITS = {
+  starter: {
+    id: 'starter',
+    name: 'Starter',
+    price: 0,
+    accounts: 1,
+    agents: 1,
+    rules: 2,
+    campaigns: 5,
+    insights: 10,
+    frequency: 'A cada 24h',
+    support: 'E-mail',
+    badge: 'default',
+  },
   basic: {
     id: 'basic',
     name: 'Básico',
@@ -56,6 +69,7 @@ export const PLAN_LIMITS = {
 }
 
 export const PLAN_OPTIONS = [
+  { id: 'starter',  label: 'Starter — R$ 0,00/mês' },
   { id: 'basic',    label: 'Básico — R$ 29,90/mês' },
   { id: 'pro',      label: 'Pro — R$ 67,90/mês' },
   { id: 'advanced', label: 'Avançado — R$ 147,00/mês' },
@@ -82,6 +96,7 @@ export async function loadSystemSettings(supabase) {
     if (data) {
       const planLimitsObj = data.find(item => item.id === 'plan_limits')?.value
       if (planLimitsObj) {
+        Object.assign(PLAN_LIMITS.starter, planLimitsObj.starter)
         Object.assign(PLAN_LIMITS.basic, planLimitsObj.basic)
         Object.assign(PLAN_LIMITS.pro, planLimitsObj.pro)
         Object.assign(PLAN_LIMITS.advanced, planLimitsObj.advanced)
@@ -99,6 +114,7 @@ export async function loadSystemSettings(supabase) {
 
 
 export const PLAN_BADGE_VARIANT = {
+  starter:    'default',
   basic:      'default',
   pro:        'brand',
   advanced:   'success',

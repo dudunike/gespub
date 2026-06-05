@@ -1,7 +1,7 @@
 // Contexto de conexão Meta Ads — suporte a múltiplas contas por plano
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { fbLogin, fbLogout, META_APP_ID } from '../lib/metaSDK'
+import { META_APP_ID } from '../lib/metaSDK'
 import { getAdAccounts, checkTokenValid } from '../lib/metaApi'
 import { useAuth } from './AuthContext'
 import { getPlan } from '../utils/planLimits'
@@ -11,6 +11,7 @@ const MetaContext = createContext(null)
 export function MetaProvider({ children }) {
   const { user } = useAuth()
   const [connections, setConnections] = useState([])
+  const [selectedAccountId, setSelectedAccountId] = useState('active')
   const [loadingConnection, setLoadingConnection] = useState(true)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState(null)
@@ -26,6 +27,12 @@ export function MetaProvider({ children }) {
     let active = true
 
     async function loadConnections() {
+      // Limpeza de segurança: Se o Meta retornou token no hash (fluxo implícito acidental), limpa imediatamente
+      if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        console.warn('Token encontrado e removido da URL por segurança.');
+      }
+
       const { data } = await supabase
         .from('meta_connections')
         .select('*')
@@ -43,8 +50,8 @@ export function MetaProvider({ children }) {
       // Garante que exatamente uma conexão está ativa
       const activeConn = data.find(c => c.is_active) || data[0]
 
-      // Valida token da conexão ativa
-      const isValid = await checkTokenValid(activeConn.access_token)
+      // Valida token da conexão ativa (agora via proxy, sem precisar passar token)
+      const isValid = await checkTokenValid()
       if (!active) return
 
       if (!isValid) {
@@ -79,8 +86,22 @@ export function MetaProvider({ children }) {
     return () => { active = false }
   }, [user])
 
-  // Conexão ativa (usada pelo dashboard, campanhas, anúncios, etc.)
+  // Conexão ativa (backward-compatível)
   const activeConnection = connections.find(c => c.is_active) || connections[0] || null
+
+  // Múltiplas contas selecionadas
+  const activeAccounts = typeof window !== 'undefined' && React.useMemo ? React.useMemo(() => {
+    if (!connections || connections.length === 0) return []
+    if (selectedAccountId === 'all') return connections
+    if (selectedAccountId === 'active') return [activeConnection].filter(Boolean)
+    return connections.filter(c => c.account_id === selectedAccountId)
+  }, [selectedAccountId, connections, activeConnection]) : (() => {
+    // Fallback caso useMemo não esteja disponível no primeiro render SSR
+    if (!connections || connections.length === 0) return []
+    if (selectedAccountId === 'all') return connections
+    if (selectedAccountId === 'active') return [activeConnection].filter(Boolean)
+    return connections.filter(c => c.account_id === selectedAccountId)
+  })()
 
   // Limites do plano — admin sempre tem máximo
   const planLimits = getPlan(user?.plan || 'basic')
@@ -88,34 +109,26 @@ export function MetaProvider({ children }) {
   const canAddAccount = connections.length < accountsLimit
 
   // Fluxo redirect OAuth
-  const startConnectRedirect = useCallback(() => {
+  const startConnectRedirect = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const stateObj = {
+      t: session?.access_token,
+      o: window.location.origin
+    }
+    const stateB64 = btoa(JSON.stringify(stateObj))
+
     const params = new URLSearchParams({
       client_id:     META_APP_ID,
-      redirect_uri:  'https://gespub.online/conexoes',
+      redirect_uri:  `${window.location.origin}/api/meta-callback`,
       scope:         'ads_management,pages_show_list,pages_read_engagement',
-      response_type: 'token',
+      response_type: 'code',
+      state:         stateB64
     })
     window.location.href = `https://www.facebook.com/dialog/oauth?${params}`
   }, [])
 
-  // Fluxo popup (legado)
-  const startConnect = useCallback(async () => {
-    setError(null)
-    setConnecting(true)
-    try {
-      const auth = await fbLogin()
-      const accounts = await getAdAccounts(auth.accessToken)
-      return { accessToken: auth.accessToken, accounts }
-    } catch (err) {
-      setError(err.message)
-      throw err
-    } finally {
-      setConnecting(false)
-    }
-  }, [])
-
-  // Salva nova conexão (com verificação de limite do plano)
-  const saveConnection = useCallback(async (accessToken, account) => {
+  // Salva nova conexão usando o proxy
+  const saveConnection = useCallback(async (account) => {
     if (!user) throw new Error('Usuário não autenticado')
     setError(null)
 
@@ -142,23 +155,21 @@ export function MetaProvider({ children }) {
       await supabase.from('meta_connections').update({ is_active: false }).eq('user_id', user.id)
     }
 
-    const payload = {
-      user_id:      user.id,
-      access_token: accessToken,
-      account_id:   account.id,
-      account_name: account.name,
-      currency:     account.currency || 'BRL',
-      connected_at: new Date().toISOString(),
-      is_active:    true,
-    }
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/meta-proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        path: '/add-account',
+        body: { id: account.id, name: account.name, currency: account.currency }
+      })
+    })
 
-    const { data, error: dbErr } = await supabase
-      .from('meta_connections')
-      .upsert(payload, { onConflict: 'user_id,account_id' })
-      .select()
-      .single()
-
-    if (dbErr) throw new Error(dbErr.message)
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
 
     setConnections(prev => {
       const others = prev.map(c => ({ ...c, is_active: false })).filter(c => c.account_id !== account.id)
@@ -189,7 +200,7 @@ export function MetaProvider({ children }) {
       remaining[0] = { ...remaining[0], is_active: true }
     }
     if (target?.is_active && remaining.length === 0) {
-      await fbLogout().catch(() => {})
+      // Não tentamos mais fbLogout, apenas removemos da base
     }
     setConnections(remaining)
   }, [user, connections])
@@ -207,7 +218,6 @@ export function MetaProvider({ children }) {
     if (!user) return
     try {
       await supabase.from('meta_connections').delete().eq('user_id', user.id)
-      await fbLogout()
     } catch (e) {
       console.warn('Erro ao desconectar Meta:', e)
     } finally {
@@ -219,10 +229,12 @@ export function MetaProvider({ children }) {
     // Conexão ativa (backward-compat com dashboard, campanhas, anúncios)
     isConnected:  !!activeConnection,
     connection:   activeConnection,
-    accessToken:  activeConnection?.access_token  || null,
     accountId:    activeConnection?.account_id    || null,
     accountName:  activeConnection?.account_name  || null,
     currency:     activeConnection?.currency      || 'BRL',
+    selectedAccountId,
+    setSelectedAccountId,
+    activeAccounts,
     // Múltiplas contas
     connections,
     accountsLimit,
@@ -234,7 +246,6 @@ export function MetaProvider({ children }) {
     error,
     setError,
     // Ações
-    startConnect,
     startConnectRedirect,
     saveConnection,
     switchConnection,

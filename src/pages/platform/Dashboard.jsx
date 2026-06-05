@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { IconPlugConnected, IconRefresh, IconRobot, IconAlertCircle, IconTrendingUp, IconHeart, IconUserPlus, IconMessageCircle, IconShare2 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
+import Select from '../../components/ui/Select'
 import DateFilter from '../../components/ui/DateFilter'
 import { useMeta } from '../../context/MetaContext'
 import {
@@ -53,7 +54,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { isConnected, accessToken, accountId, accountName, loadingConnection } = useMeta()
+  const { isConnected, accessToken, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
 
   const [insights, setInsights] = useState([])
   const [loading, setLoading] = useState(false)
@@ -66,12 +67,14 @@ export default function Dashboard() {
 
   // Busca insights reais do Meta Ads
   const loadInsights = async () => {
-    if (!isConnected || !accessToken || !accountId) return
+    if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true)
     setError(null)
     try {
-      const data = await getCampaignInsights(accountId, accessToken, datePreset, timeRange)
-      setInsights(data)
+      const allInsights = await Promise.all(activeAccounts.map(acc => 
+        getCampaignInsights(acc.account_id, accessToken, datePreset, timeRange)
+      ))
+      setInsights(allInsights.flat())
       setLastUpdated(new Date())
     } catch (err) {
       setError(err.message)
@@ -83,7 +86,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (datePreset === 'custom' && (!timeRange?.since || !timeRange?.until)) return
     loadInsights()
-  }, [isConnected, accessToken, accountId, datePreset, timeRange])
+  }, [isConnected, accessToken, activeAccounts, datePreset, timeRange])
 
   // Busca seguidores reais do Facebook e Instagram
   useEffect(() => {
@@ -192,11 +195,22 @@ export default function Dashboard() {
       {/* Header com conta + período + atualizar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {accountName && (
+          {connections.length > 1 ? (
+            <Select
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              className="w-48 !py-1.5"
+              options={[
+                { id: 'active', label: 'Conta Ativa' },
+                { id: 'all', label: `Todas as contas (${connections.length})` },
+                ...connections.map(c => ({ id: c.account_id, label: c.account_name }))
+              ]}
+            />
+          ) : connections.length === 1 ? (
             <span className="text-xs font-medium bg-surface-bg border border-border px-3 py-1 rounded-full text-txt-secondary">
-              {accountName}
+              {connections[0].account_name}
             </span>
-          )}
+          ) : null}
           {lastUpdated && (
             <span className="text-xs text-txt-secondary">
               Atualizado às {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

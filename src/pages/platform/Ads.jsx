@@ -3,9 +3,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   IconList, IconLayoutGrid, IconPlayerPlay,
-  IconPlugConnected, IconRefresh, IconAlertCircle,
+  IconPlugConnected, IconAlertCircle,
   IconExternalLink, IconPlayerPause, IconPhoto,
   IconChevronDown, IconSearch, IconHeart, IconUserPlus,
+  IconChevronUp
 } from '@tabler/icons-react'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -55,7 +56,7 @@ function AdPreview({ url, type, name, size = 'full' }) {
   const isSmall = size === 'sm'
   const cls = isSmall
     ? 'w-14 h-14 rounded-lg shrink-0 overflow-hidden'
-    : 'w-full aspect-[4/3] overflow-hidden bg-surface-bg'
+    : 'w-full aspect-square overflow-hidden bg-surface-bg'
 
   const gradients = {
     image:    'from-violet-500 to-purple-700',
@@ -108,7 +109,7 @@ function AdPreview({ url, type, name, size = 'full' }) {
 
 export default function Ads() {
   const navigate = useNavigate()
-  const { isConnected, accessToken, accountId, accountName, loadingConnection } = useMeta()
+  const { isConnected, accessToken, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
 
   const [viewMode, setViewMode]         = useState('grid')
   const [ads, setAds]                   = useState([])
@@ -124,29 +125,35 @@ export default function Ads() {
   const [filterAdSet, setFilterAdSet]   = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [search, setSearch]             = useState('')
+  const [sortField, setSortField] = useState('spend')
+  const [sortDirection, setSortDirection] = useState('desc')
 
   const loadData = useCallback(async () => {
-    if (!isConnected || !accessToken || !accountId) return
+    if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true); setError(null)
     try {
-      const [rawAds, rawInsights, rawCampaigns, rawAdSets] = await Promise.all([
-        getAdsWithCreatives(accountId, accessToken),
-        getAdInsights(accountId, accessToken, datePreset, timeRange),
-        getCampaigns(accountId, accessToken),
-        getAdSets(accountId, accessToken),
-      ])
-      setAds(rawAds)
-      setCampaigns(rawCampaigns)
-      setAdSets(rawAdSets)
+      const allAdsRaw = await Promise.all(activeAccounts.map(acc => getAdsWithCreatives(acc.account_id, accessToken)))
+      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getAdInsights(acc.account_id, accessToken, datePreset, timeRange)))
+      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id, accessToken)))
+      const allAdSetsRaw = await Promise.all(activeAccounts.map(acc => getAdSets(acc.account_id, accessToken)))
+
+      const mergedAds = []
+      allAdsRaw.forEach((arr, i) => {
+        arr.forEach(a => mergedAds.push({ ...a, __account_name: activeAccounts[i].account_name, __account_id: activeAccounts[i].account_id }))
+      })
+      setAds(mergedAds)
+      setCampaigns(allCampaignsRaw.flat())
+      setAdSets(allAdSetsRaw.flat())
+
       const idx = {}
-      rawInsights.forEach((i) => { idx[i.ad_id] = i })
+      allInsightsRaw.flat().forEach((i) => { idx[i.ad_id] = i })
       setInsights(idx)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, accountId, datePreset, timeRange])
+  }, [isConnected, accessToken, activeAccounts, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -170,7 +177,12 @@ export default function Ads() {
     const status      = ad.effective_status || ad.status
     const creative    = ad.creative || {}
     const type        = detectAdType(creative)
-    const thumbnailUrl = creative.thumbnail_url || creative.image_url || null
+    // Para imagem/carrossel usa image_url (alta res); para vídeo usa thumbnail_url
+    const storySpec = creative.object_story_spec || {}
+    const linkPicture = storySpec.link_data?.picture || storySpec.video_data?.image_url || null
+    const thumbnailUrl = type === 'video'
+      ? (creative.thumbnail_url || creative.image_url || linkPicture || null)
+      : (creative.image_url || linkPicture || creative.thumbnail_url || null)
     const spend        = Number(ins.spend        || 0)
     const impressions  = Number(ins.impressions  || 0)
     const clicks       = Number(ins.clicks       || 0)
@@ -203,6 +215,8 @@ export default function Ads() {
       adSetName:    ad.adset?.name    || adSetMap[adSetId]       || adSetId    || '—',
       spend, impressions, clicks, ctr, cpc, frequency, reach, conversions,
       reactions, pageLikes, comments,
+      __account_name: ad.__account_name,
+      __account_id: ad.__account_id
     }
   }
 
@@ -220,6 +234,31 @@ export default function Ads() {
     if (search && !ad.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
+
+  filtered.sort((a, b) => {
+    let valA = a[sortField] ?? 0
+    let valB = b[sortField] ?? 0
+    if (typeof valA === 'string') valA = valA.toLowerCase()
+    if (typeof valB === 'string') valB = valB.toLowerCase()
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1
+    return 0
+  })
+
+  const tSpend = filtered.reduce((s, c) => s + c.spend, 0)
+  const tImp = filtered.reduce((s, c) => s + c.impressions, 0)
+  const tConv = filtered.reduce((s, c) => s + c.conversions, 0)
+  const tReach = filtered.reduce((s, c) => s + c.reach, 0)
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDirection('desc') }
+  }
+
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? <IconChevronUp size={14} className="ml-1 inline" /> : <IconChevronDown size={14} className="ml-1 inline" />
+  }
 
   const campaignOptions = campaigns.map((c) => ({ id: c.id, label: c.name }))
   const adSetOptions    = adSetsForCampaign.map((s) => ({ id: s.id, label: s.name }))
@@ -286,11 +325,22 @@ export default function Ads() {
         />
 
         <div className="ml-auto flex items-center gap-2">
-          {accountName && (
+          {connections.length > 1 ? (
+            <Select
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              className="w-48 !py-1.5 hidden sm:block"
+              options={[
+                { id: 'active', label: 'Conta Ativa' },
+                { id: 'all', label: `Todas as contas (${connections.length})` },
+                ...connections.map(c => ({ id: c.account_id, label: c.account_name }))
+              ]}
+            />
+          ) : connections.length === 1 ? (
             <span className="text-xs text-txt-secondary bg-surface-bg px-2.5 py-1 rounded-full border border-border hidden sm:block">
-              {accountName}
+              {connections[0].account_name}
             </span>
-          )}
+          ) : null}
           <DateFilter
             preset={datePreset}
             since={timeRange?.since}
@@ -382,7 +432,7 @@ export default function Ads() {
 
                   {/* Link externo */}
                   <a
-                    href={`https://business.facebook.com/adsmanager/manage/ads?act=${accountId?.replace('act_', '')}&selected_ad_ids=${ad.id}`}
+                    href={`https://business.facebook.com/adsmanager/manage/ads?act=${(ad.__account_id || selectedAccountId)?.replace('act_', '')}&selected_ad_ids=${ad.id}`}
                     target="_blank" rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     className="absolute bottom-2 right-2 p-1.5 bg-white/90 rounded-input text-txt-secondary hover:text-brand-500 shadow-sm transition-all"
@@ -493,9 +543,17 @@ export default function Ads() {
           <table className="w-full min-w-[1000px]">
             <thead>
               <tr className="border-b border-border bg-surface-bg">
-                {['Anúncio', 'Campanha / Conjunto', 'Tipo', 'Investido', 'Impressões', 'CTR', 'CPC', 'Frequência', 'Curtidas', 'Seguidores', 'Conversões', 'Status', ''].map((h) => (
-                  <th key={h} className="text-left text-xs font-medium text-txt-secondary px-3 py-3 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                {[
+                  { k: 'name', l: 'Anúncio' }, { k: 'campaignName', l: 'Campanha / Conjunto' }, { k: 'type', l: 'Tipo' },
+                  { k: 'spend', l: 'Investido' }, { k: 'impressions', l: 'Impressões' }, { k: 'ctr', l: 'CTR' },
+                  { k: 'cpc', l: 'CPC' }, { k: 'frequency', l: 'Frequência' }, { k: 'reactions', l: 'Curtidas' },
+                  { k: 'pageLikes', l: 'Seguidores' }, { k: 'conversions', l: 'Conversões' }, { k: 'status', l: 'Status' }
+                ].map((col) => (
+                  <th key={col.k} onClick={() => handleSort(col.k)} className="text-left text-xs font-medium text-txt-secondary px-3 py-3 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-txt-primary">
+                    {col.l} <SortIcon field={col.k} />
+                  </th>
                 ))}
+                <th className="text-left text-xs font-medium text-txt-secondary px-3 py-3 uppercase tracking-wide whitespace-nowrap">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -509,6 +567,9 @@ export default function Ads() {
                         <AdPreview url={ad.thumbnailUrl} type={ad.type} name={ad.name} size="sm" />
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-txt-primary truncate">{ad.name}</p>
+                          {selectedAccountId === 'all' && (
+                            <p className="text-[10px] text-brand-500 font-medium truncate mt-0">{ad.__account_name}</p>
+                          )}
                           <p className="text-xs text-txt-secondary font-mono truncate">{ad.id}</p>
                         </div>
                       </div>
@@ -573,7 +634,7 @@ export default function Ads() {
                           }
                         </button>
                         <a
-                          href={`https://business.facebook.com/adsmanager/manage/ads?act=${accountId?.replace('act_', '')}&selected_ad_ids=${ad.id}`}
+                          href={`https://business.facebook.com/adsmanager/manage/ads?act=${(ad.__account_id || selectedAccountId)?.replace('act_', '')}&selected_ad_ids=${ad.id}`}
                           target="_blank" rel="noopener noreferrer"
                           className="p-1.5 rounded-input text-txt-secondary hover:text-brand-500 hover:bg-brand-50 transition-all inline-flex"
                           title="Ver no Gerenciador">
@@ -585,6 +646,23 @@ export default function Ads() {
                 )
               })}
             </tbody>
+            <tfoot className="bg-surface-bg border-t border-border">
+              <tr>
+                <td className="px-3 py-3 text-sm font-bold text-txt-primary">Totais ({filtered.length})</td>
+                <td className="px-3 py-3"></td>
+                <td className="px-3 py-3"></td>
+                <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend)}</td>
+                <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatNumber(tImp)}</td>
+                <td className="px-3 py-3"></td>
+                <td className="px-3 py-3"></td>
+                <td className="px-3 py-3"></td>
+                <td className="px-3 py-3"></td>
+                <td className="px-3 py-3"></td>
+                <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
+                <td className="px-3 py-3"></td>
+                <td className="px-3 py-3"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

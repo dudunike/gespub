@@ -29,7 +29,16 @@ export default async function handler(req, res) {
       // Decodifica base64 → JSON
       const decoded = Buffer.from(state, 'base64').toString('utf-8')
       stateData = JSON.parse(decoded)
-      if (stateData.o) returnBase = stateData.o
+      
+      if (stateData.o) {
+        // Validação contra Open Redirect
+        const allowedOrigins = ['https://gespub.online', 'https://www.gespub.online', 'http://localhost:3000', 'http://localhost:5173']
+        if (allowedOrigins.includes(stateData.o)) {
+          returnBase = stateData.o
+        } else {
+          console.warn('[meta-callback] Origin não permitida ignorada:', stateData.o)
+        }
+      }
     } catch {
       // State inválido — continua com defaults
     }
@@ -74,7 +83,13 @@ export default async function handler(req, res) {
   }
 
   // Credenciais Meta
-  const appId = process.env.VITE_META_APP_ID || '2072345476678142'
+  const appId = process.env.VITE_META_APP_ID
+
+  if (!appId) {
+    console.error('[meta-callback] VITE_META_APP_ID not set')
+    return redirectTo('/conexoes?error=App ID não configurado no servidor')
+  }
+
   const appSecret = process.env.META_APP_SECRET
 
   if (!appSecret) {
@@ -83,7 +98,8 @@ export default async function handler(req, res) {
   }
 
   // O redirect_uri precisa ser EXATAMENTE o mesmo usado no redirect inicial
-  const redirectUri = 'https://gespub.vercel.app/api/meta-callback'
+  const origin = stateData.o || `https://${req.headers.host}`
+  const redirectUri = `${origin}/api/meta-callback`
 
   try {
     // ── Troca o code por access_token ──────────────────────────────────────
@@ -108,7 +124,8 @@ export default async function handler(req, res) {
 
     // ── Busca as contas de anúncio do usuário ─────────────────────────────
     const accountsRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,currency&access_token=${accessToken}`
+      `https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,currency`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     )
     const accountsData = await accountsRes.json()
     const accounts = accountsData.data || []

@@ -1,9 +1,10 @@
 // Campanhas — dados reais do Meta Ads com edição direta
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconRefresh, IconPlayerPlay, IconPlayerPause, IconEdit, IconExternalLink, IconAlertCircle, IconPlugConnected } from '@tabler/icons-react'
+import { IconRefresh, IconPlayerPlay, IconPlayerPause, IconEdit, IconExternalLink, IconAlertCircle, IconPlugConnected, IconChevronUp, IconChevronDown } from '@tabler/icons-react'
 import Tabs from '../../components/ui/Tabs'
 import Button from '../../components/ui/Button'
+import Select from '../../components/ui/Select'
 import DateFilter from '../../components/ui/DateFilter'
 import { useMeta } from '../../context/MetaContext'
 import {
@@ -82,7 +83,7 @@ function BudgetModal({ campaign, onSave, onClose }) {
 
 export default function Campaigns() {
   const navigate = useNavigate()
-  const { isConnected, accessToken, accountId, accountName, loadingConnection } = useMeta()
+  const { isConnected, accessToken, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
 
   const [campaigns, setCampaigns] = useState([])
   const [insights, setInsights] = useState({})   // campaignId → insight obj
@@ -93,27 +94,34 @@ export default function Campaigns() {
   const [timeRange, setTimeRange]   = useState(null)
   const [editingBudget, setEditingBudget] = useState(null)
   const [toggling, setToggling] = useState({})   // campaignId → bool
+  const [sortField, setSortField] = useState('spend')
+  const [sortDirection, setSortDirection] = useState('desc')
 
   const loadData = useCallback(async () => {
-    if (!isConnected || !accessToken || !accountId) return
+    if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true)
     setError(null)
     try {
-      const [rawCampaigns, rawInsights] = await Promise.all([
-        getCampaigns(accountId, accessToken),
-        getCampaignInsights(accountId, accessToken, datePreset, timeRange),
-      ])
-      setCampaigns(rawCampaigns)
-      // Indexar insights por campaign_id
+      const allCampaignsRaw = await Promise.all(activeAccounts.map(acc => getCampaigns(acc.account_id, accessToken)))
+      const allInsightsRaw = await Promise.all(activeAccounts.map(acc => getCampaignInsights(acc.account_id, accessToken, datePreset, timeRange)))
+
+      const mergedCampaigns = []
+      allCampaignsRaw.forEach((campArray, i) => {
+        campArray.forEach(c => {
+          mergedCampaigns.push({ ...c, __account_name: activeAccounts[i].account_name, __account_id: activeAccounts[i].account_id })
+        })
+      })
+      setCampaigns(mergedCampaigns)
+
       const idx = {}
-      rawInsights.forEach((ins) => { idx[ins.campaign_id] = ins })
+      allInsightsRaw.flat().forEach((ins) => { idx[ins.campaign_id] = ins })
       setInsights(idx)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, accountId, datePreset, timeRange])
+  }, [isConnected, accessToken, activeAccounts, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -160,6 +168,59 @@ export default function Campaigns() {
     { id: 'paused', label: 'Pausadas', count: campaigns.filter((c) => (c.effective_status || c.status) === 'PAUSED').length },
   ]
 
+  const prepared = filtered.map(c => {
+    const ins = insights[c.id] || {}
+    const spend = Number(ins.spend || 0)
+    const impressions = Number(ins.impressions || 0)
+    const clicks = Number(ins.clicks || 0)
+    const ctr = Number(ins.ctr || 0)
+    const cpc = Number(ins.cpc || 0)
+
+    const purchases = getActionCount(ins.actions, 'purchase')
+    const whatsapp  = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
+    const leads     = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
+    const totalConversions = purchases + whatsapp + leads
+
+    const revenue = getActionValue(ins.action_values, 'purchase')
+    const roas = spend > 0 && revenue > 0 ? revenue / spend : 0
+    const cpa  = spend > 0 && totalConversions > 0 ? spend / totalConversions : 0
+
+    const budget = c.daily_budget ? Number(c.daily_budget) / 100 : c.lifetime_budget ? Number(c.lifetime_budget) / 100 : 0
+    const status = c.effective_status || c.status
+
+    return { ...c, spend, impressions, clicks, ctr, cpc, purchases, whatsapp, leads, totalConversions, revenue, roas, cpa, budget, status }
+  })
+
+  prepared.sort((a, b) => {
+    let valA = a[sortField] ?? 0
+    let valB = b[sortField] ?? 0
+    if (typeof valA === 'string') valA = valA.toLowerCase()
+    if (typeof valB === 'string') valB = valB.toLowerCase()
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1
+    return 0
+  })
+
+  const tSpend = prepared.reduce((s, c) => s + c.spend, 0)
+  const tImp = prepared.reduce((s, c) => s + c.impressions, 0)
+  const tClicks = prepared.reduce((s, c) => s + c.clicks, 0)
+  const tConv = prepared.reduce((s, c) => s + c.totalConversions, 0)
+  const tRev = prepared.reduce((s, c) => s + c.revenue, 0)
+  const tCtr = tImp > 0 ? (tClicks / tImp) * 100 : 0
+  const tCpc = tClicks > 0 ? tSpend / tClicks : 0
+  const tCpa = tConv > 0 ? tSpend / tConv : 0
+  const tRoas = tSpend > 0 ? tRev / tSpend : 0
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDirection('desc') }
+  }
+
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? <IconChevronUp size={14} className="ml-1 inline" /> : <IconChevronDown size={14} className="ml-1 inline" />
+  }
+
   // Tela: sem conexão Meta
   if (!loadingConnection && !isConnected) {
     return (
@@ -183,11 +244,22 @@ export default function Campaigns() {
       {/* Cabeçalho com conta + filtro de data */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {accountName && (
+          {connections.length > 1 ? (
+            <Select
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              className="w-48 !py-1.5"
+              options={[
+                { id: 'active', label: 'Conta Ativa' },
+                { id: 'all', label: `Todas as contas (${connections.length})` },
+                ...connections.map(c => ({ id: c.account_id, label: c.account_name }))
+              ]}
+            />
+          ) : connections.length === 1 ? (
             <span className="text-xs text-txt-secondary bg-surface-bg px-2.5 py-1 rounded-full border border-border">
-              {accountName}
+              {connections[0].account_name}
             </span>
-          )}
+          ) : null}
         </div>
         <DateFilter
           preset={datePreset}
@@ -228,104 +300,90 @@ export default function Campaigns() {
           <table className="w-full min-w-[960px]">
             <thead>
               <tr className="border-b border-border bg-surface-bg">
-                {['Campanha', 'Objetivo', 'Orçamento/dia', 'Investido', 'Impressões', 'Cliques', 'CTR', 'CPC', 'Conversões', 'CPA', 'ROAS', 'Status', 'Ações'].map((h) => (
-                  <th key={h} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap">
-                    {h}
+                {[
+                  { k: 'name', l: 'Campanha' }, { k: 'objective', l: 'Objetivo' }, { k: 'budget', l: 'Orçamento/dia' },
+                  { k: 'spend', l: 'Investido' }, { k: 'impressions', l: 'Impressões' }, { k: 'clicks', l: 'Cliques' },
+                  { k: 'ctr', l: 'CTR' }, { k: 'cpc', l: 'CPC' }, { k: 'totalConversions', l: 'Conversões' },
+                  { k: 'cpa', l: 'CPA' }, { k: 'roas', l: 'ROAS' }, { k: 'status', l: 'Status' }
+                ].map((col) => (
+                  <th key={col.k} onClick={() => handleSort(col.k)} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-txt-primary">
+                    {col.l} <SortIcon field={col.k} />
                   </th>
                 ))}
+                <th className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => {
-                const ins = insights[c.id] || {}
-                const spend = Number(ins.spend || 0)
-                const impressions = Number(ins.impressions || 0)
-                const clicks = Number(ins.clicks || 0)
-                const ctr = Number(ins.ctr || 0)
-                const cpc = Number(ins.cpc || 0)
-
-                // Conversões: Purchase + WhatsApp + Leads
-                const purchases = getActionCount(ins.actions, 'purchase')
-                const whatsapp  = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
-                const leads     = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
-                const totalConversions = purchases + whatsapp + leads
-
-                // CPA e ROAS
-                const revenue = getActionValue(ins.action_values, 'purchase')
-                const roas = spend > 0 && revenue > 0 ? revenue / spend : 0
-                const cpa  = spend > 0 && totalConversions > 0 ? spend / totalConversions : 0
-
-                const budget = c.daily_budget
-                  ? Number(c.daily_budget) / 100
-                  : c.lifetime_budget ? Number(c.lifetime_budget) / 100 : null
-
-                const status = c.effective_status || c.status
-                const isActive = status === 'ACTIVE'
+              {prepared.map((c) => {
+                const isActive = c.status === 'ACTIVE'
 
                 return (
                   <tr key={c.id} className="border-b border-border last:border-0 hover:bg-surface-bg/50 transition-colors">
                     <td className="px-4 py-3 max-w-[220px]">
                       <p className="text-sm font-medium text-txt-primary truncate">{c.name}</p>
+                      {selectedAccountId === 'all' && (
+                        <p className="text-[10px] text-brand-500 font-medium truncate mt-0.5">{c.__account_name}</p>
+                      )}
                       <p className="text-xs text-txt-secondary font-mono">{c.id}</p>
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-secondary whitespace-nowrap">
                       {META_OBJECTIVE_LABELS[c.objective] || c.objective || '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {budget ? (
+                      {c.budget ? (
                         <button
                           onClick={() => setEditingBudget(c)}
                           className="flex items-center gap-1 hover:text-brand-500 transition-colors group"
                           title="Clique para editar"
                         >
-                          {formatCurrency(budget)}
+                          {formatCurrency(c.budget)}
                           <IconEdit size={12} className="opacity-0 group-hover:opacity-100" />
                         </button>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-txt-primary whitespace-nowrap">
-                      {spend > 0 ? formatCurrency(spend) : '—'}
+                      {c.spend > 0 ? formatCurrency(c.spend) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {impressions > 0 ? formatNumber(impressions) : '—'}
+                      {c.impressions > 0 ? formatNumber(c.impressions) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {clicks > 0 ? formatNumber(clicks) : '—'}
+                      {c.clicks > 0 ? formatNumber(c.clicks) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {ctr > 0 ? formatPercent(ctr) : '—'}
+                      {c.ctr > 0 ? formatPercent(c.ctr) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {cpc > 0 ? formatCurrency(cpc) : '—'}
+                      {c.cpc > 0 ? formatCurrency(c.cpc) : '—'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {totalConversions > 0 ? (
+                      {c.totalConversions > 0 ? (
                         <div className="text-sm">
-                          <span className="font-medium text-txt-primary">{formatNumber(totalConversions)}</span>
-                          {whatsapp > 0 && (
+                          <span className="font-medium text-txt-primary">{formatNumber(c.totalConversions)}</span>
+                          {c.whatsapp > 0 && (
                             <p className="text-xs text-txt-secondary">
-                              {formatNumber(whatsapp)} WhatsApp
+                              {formatNumber(c.whatsapp)} WhatsApp
                             </p>
                           )}
                         </div>
                       ) : <span className="text-sm text-txt-secondary">—</span>}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      {cpa > 0 ? (
-                        <span className={`font-semibold ${cpa > 50 ? 'text-status-error' : cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
-                          {formatCurrency(cpa)}
+                      {c.cpa > 0 ? (
+                        <span className={`font-semibold ${c.cpa > 50 ? 'text-status-error' : c.cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
+                          {formatCurrency(c.cpa)}
                         </span>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      {roas > 0 ? (
-                        <span className={roas >= 3 ? 'text-status-success font-medium' : roas >= 2 ? 'text-txt-primary' : 'text-status-error'}>
-                          {formatRoas(roas)}
+                      {c.roas > 0 ? (
+                        <span className={c.roas >= 3 ? 'text-status-success font-medium' : c.roas >= 2 ? 'text-txt-primary' : 'text-status-error'}>
+                          {formatRoas(c.roas)}
                         </span>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <StatusChip status={status} />
+                      <StatusChip status={c.status} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1">
@@ -357,7 +415,7 @@ export default function Campaigns() {
                         </button>
                         {/* Abrir no Gerenciador */}
                         <a
-                          href={`https://business.facebook.com/adsmanager/manage/campaigns?act=${accountId?.replace('act_', '')}&selected_campaign_ids=${c.id}`}
+                          href={`https://business.facebook.com/adsmanager/manage/campaigns?act=${(c.__account_id || selectedAccountId)?.replace('act_', '')}&selected_campaign_ids=${c.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           title="Abrir no Gerenciador de Anúncios"
@@ -371,6 +429,23 @@ export default function Campaigns() {
                 )
               })}
             </tbody>
+            <tfoot className="bg-surface-bg border-t border-border">
+              <tr>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">Totais ({prepared.length})</td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tImp)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tClicks)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatPercent(tCtr)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpc)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpa)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatRoas(tRoas)}</td>
+                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3"></td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>
