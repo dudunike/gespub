@@ -3,7 +3,7 @@ import {
   IconBrandFacebook, IconExternalLink,
   IconCheck, IconAlertCircle, IconLoader2, IconRefresh,
   IconStar, IconTrash, IconPlus, IconArrowsExchange,
-  IconShieldCheck, IconCrown,
+  IconShieldCheck, IconCrown, IconActivity
 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
 import { useMeta } from '../../context/MetaContext'
@@ -122,6 +122,8 @@ export default function Connections() {
   })
   const [switchingId, setSwitchingId]             = useState(null)
   const [removingId, setRemovingId]               = useState(null)
+  const [testingApi, setTestingApi]               = useState(false)
+  const [testResult, setTestResult]               = useState(null)
 
   const plan       = user?.plan || 'basic'
   const isUnlimited = accountsLimit >= 999 || isAdmin
@@ -206,6 +208,25 @@ export default function Connections() {
     try { await removeConnection(id) }
     catch (err) { setLocalError(err.message) }
     finally { setRemovingId(null) }
+  }
+
+  const handleTestApi = async () => {
+    if (!connection?.account_id) return
+    setTestingApi(true)
+    setTestResult(null)
+    try {
+      const { getCampaigns, getPageFollowers } = await import('../../lib/metaApi')
+      const campaigns = await getCampaigns(connection.account_id)
+      const pages = await getPageFollowers()
+      setTestResult({
+        success: true,
+        message: `Teste concluído com sucesso!\n• ads_management: ${campaigns.length} campanhas lidas.\n• pages_read_engagement: Seguidores FB (${pages.fbFollowers}), IG (${pages.igFollowers}).`
+      })
+    } catch (err) {
+      setTestResult({ success: false, message: `Erro no teste da API: ${err.message}` })
+    } finally {
+      setTestingApi(false)
+    }
   }
 
   const displayError = localError || error
@@ -353,6 +374,37 @@ export default function Connections() {
                 Reconectar
               </Button>
             </div>
+
+            {/* Bloco de Teste de API (App Review) */}
+            {isConnected && connection && (
+              <div className="mt-6 p-5 bg-[#F8FAFC] border border-border rounded-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <IconActivity size={18} className="text-brand-500" />
+                  <h3 className="text-sm font-semibold text-txt-primary">Validação da API (App Review)</h3>
+                </div>
+                <p className="text-xs text-txt-secondary mb-4">
+                  Clique no botão abaixo para testar as permissões (ads_management e pages_read_engagement). Ideal para os revisores da Meta confirmarem a execução da API.
+                </p>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={handleTestApi} 
+                  disabled={testingApi} 
+                  icon={testingApi ? IconLoader2 : IconCheck}
+                >
+                  {testingApi ? 'Executando...' : 'Testar Execução da API Meta'}
+                </Button>
+                
+                {testResult && (
+                  <div className={`mt-4 p-3 rounded-input text-xs whitespace-pre-wrap ${testResult.success ? 'bg-status-successBg text-status-success border border-status-success/30' : 'bg-status-errorBg text-status-error border border-status-error'}`}>
+                    <div className="flex items-start gap-2">
+                      {testResult.success ? <IconCheck size={16} className="shrink-0 mt-0.5" /> : <IconAlertCircle size={16} className="shrink-0 mt-0.5" />}
+                      <span className="leading-relaxed">{testResult.message}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

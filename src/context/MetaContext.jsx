@@ -25,6 +25,7 @@ export function MetaProvider({ children }) {
     }
 
     let active = true
+    setLoadingConnection(true)
 
     async function loadConnections() {
       // Limpeza de segurança: Se o Meta retornou token no hash (fluxo implícito acidental), limpa imediatamente
@@ -41,7 +42,16 @@ export function MetaProvider({ children }) {
 
       if (!active) return
 
-      const validData = data.filter(c => c.account_id !== 'PENDING')
+      const validData = (data || []).filter(c => c.account_id !== 'PENDING')
+      const hasPending = (data || []).some(c => c.account_id === 'PENDING')
+
+      // Se há uma conexão PENDING, o OAuth está em progresso —
+      // deixa o fluxo de seleção de conta do Connections.jsx cuidar disso
+      if (hasPending) {
+        setConnections([])
+        setLoadingConnection(false)
+        return
+      }
 
       if (validData.length === 0) {
         setConnections([])
@@ -58,7 +68,7 @@ export function MetaProvider({ children }) {
 
       if (!isValid) {
         await supabase.from('meta_connections').delete().eq('id', activeConn.id)
-        const remaining = data.filter(c => c.id !== activeConn.id)
+        const remaining = validData.filter(c => c.id !== activeConn.id)
         if (remaining.length > 0) {
           await supabase.from('meta_connections')
             .update({ is_active: true })
