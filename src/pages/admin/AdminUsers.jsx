@@ -374,22 +374,39 @@ export default function AdminUsers() {
       }
     }
 
-    // FALLBACK: Criação pelo Cliente (Supabase Auth)
-    // Ocorre apenas se a service_role key não estiver configurada no backend
-    const { data, error } = await supabase.auth.signUp({
-      email:    form.email,
-      password: form.password,
-      options:  { data: { name: form.name } },
-    })
-
-    if (error) {
-      if (adminSession) await supabase.auth.setSession({ access_token: adminSession.access_token, refresh_token: adminSession.refresh_token })
-      throw new Error(error.message)
+    // FALLBACK: Criação pelo Cliente via RAW FETCH
+    // Fazemos um fetch direto para a API do Supabase ignorando o SDK (supabase-js)
+    // Isso impede que o SDK detecte a nova sessão e dispare eventos que deslogam o admin.
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL || ''
+    const ANON_KEY     = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY || ''
+    
+    if (!SUPABASE_URL || !ANON_KEY) {
+      throw new Error('As chaves do Supabase não estão configuradas no frontend.')
     }
 
-    if (data?.user) {
+    const signupRes = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': ANON_KEY,
+      },
+      body: JSON.stringify({
+        email: form.email,
+        password: form.password,
+        data: { name: form.name }
+      })
+    })
+
+    const signupData = await signupRes.json()
+
+    if (!signupRes.ok) {
+      throw new Error(signupData.msg || signupData.message || signupData.error_description || 'Erro desconhecido no cadastro')
+    }
+
+    const newUser = signupData.user || signupData
+    if (newUser?.id) {
       const { error: profileError } = await supabase.from('profiles').upsert({
-        id:              data.user.id,
+        id:              newUser.id,
         name:            form.name,
         role:            'user',
         plan:            form.plan,
@@ -397,14 +414,6 @@ export default function AdminUsers() {
         plan_start_at:   form.plan_start_at   || null,
         plan_expires_at: form.plan_expires_at || null,
       })
-
-      // Restaura a sessão do administrador imediatamente após a criação do usuário
-      if (adminSession) {
-        await supabase.auth.setSession({
-          access_token: adminSession.access_token,
-          refresh_token: adminSession.refresh_token
-        })
-      }
 
       if (profileError) throw new Error(profileError.message)
     }
