@@ -17,7 +17,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Configuração do servidor incompleta' })
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    global: { headers: { Authorization: auth } }
+  })
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser(auth.replace('Bearer ', ''))
   if (authErr || !user) return res.status(401).json({ error: 'Token inválido' })

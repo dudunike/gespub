@@ -36,8 +36,12 @@ export async function checkTokenValid() {
   try {
     await apiFetch('/me', { fields: 'id' })
     return true
-  } catch {
-    return false
+  } catch (err) {
+    if (err.message.includes('Token expirado') || err.message.includes('190') || err.message.includes('expirou')) {
+      return false
+    }
+    console.warn('[checkTokenValid] Falhou, mas assumindo válido para evitar deleção acidental:', err.message)
+    return true
   }
 }
 
