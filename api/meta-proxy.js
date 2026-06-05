@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     // 2. Verifica Limite de Contas no Servidor (bypass prevention)
     const [ { data: profile }, { data: existingConns }, { data: settings } ] = await Promise.all([
       supabase.from('profiles').select('plan, role').eq('id', user.id).single(),
-      supabase.from('meta_connections').select('id, access_token').eq('user_id', user.id),
+      supabase.from('meta_connections').select('id, account_id, is_active, access_token').eq('user_id', user.id),
       supabase.from('system_settings').select('value').eq('id', 'plan_limits').single()
     ])
 

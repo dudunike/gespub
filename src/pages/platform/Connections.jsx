@@ -116,7 +116,10 @@ export default function Connections() {
   const [pendingToken, setPendingToken]           = useState(null)
   const [localError, setLocalError]               = useState(null)
   const [saving, setSaving]                       = useState(false)
-  const [processingReturn, setProcessingReturn]   = useState(false)
+  const [processingReturn, setProcessingReturn]   = useState(() => {
+    const sp = new URLSearchParams(window.location.search)
+    return !!(sp.get('code') || sp.get('selecting'))
+  })
   const [switchingId, setSwitchingId]             = useState(null)
   const [removingId, setRemovingId]               = useState(null)
 
