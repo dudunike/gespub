@@ -32,13 +32,6 @@ import AdminSettings from './pages/admin/AdminSettings'
 // Rota protegida — redireciona para login se não autenticado
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
-  
-  // Permite acesso temporário se estiver voltando do OAuth (para o Connections interceptar e enviar ao backend)
-  const searchParams = new URLSearchParams(window.location.search)
-  if (searchParams.get('code') && searchParams.get('state')) {
-    return children
-  }
-
   if (!isAuthenticated) return <Navigate to="/" replace />
   return children
 }

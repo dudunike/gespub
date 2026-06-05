@@ -12,5 +12,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // Desativa o navigator.locks que causa deadlock no browser quando há
     // múltiplas operações concorrentes ou abas anteriores com lock pendurado.
     lock: async (_name, _acquireTimeout, fn) => await fn(),
+    // Impede o Supabase de interceptar ?code= na URL — esse parâmetro pertence
+    // ao OAuth do Facebook, não ao Supabase. Sem isso o Supabase tenta fazer
+    // troca PKCE com o código do Facebook, falha e desloga o usuário.
+    detectSessionInUrl: false,
   },
 })

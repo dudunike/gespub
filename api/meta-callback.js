@@ -97,13 +97,13 @@ export default async function handler(req, res) {
     return redirectTo('/conexoes?error=App Secret não configurado no servidor')
   }
 
-  // O redirect_uri deve ser EXATAMENTE o que está cadastrado no app Meta
-  // e o mesmo enviado no início do fluxo OAuth (MetaContext.jsx)
+  // redirect_uri deve ser EXATAMENTE igual ao enviado no início do OAuth
+  // (MetaContext.jsx aponta para /api/meta-callback agora)
   const rawOrigin = stateData.o || `https://${req.headers.host}`
   const normalizedOrigin = rawOrigin.replace('https://www.', 'https://')
   const redirectUri = normalizedOrigin.startsWith('http://localhost')
-    ? `${normalizedOrigin}/conexoes`
-    : 'https://gespub.online/conexoes'
+    ? `${normalizedOrigin}/api/meta-callback`
+    : 'https://gespub.online/api/meta-callback'
 
   try {
     // ── Troca o code por access_token ──────────────────────────────────────

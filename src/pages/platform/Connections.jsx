@@ -118,7 +118,7 @@ export default function Connections() {
   const [saving, setSaving]                       = useState(false)
   const [processingReturn, setProcessingReturn]   = useState(() => {
     const sp = new URLSearchParams(window.location.search)
-    return !!(sp.get('code') || sp.get('selecting'))
+    return !!sp.get('selecting')
   })
   const [switchingId, setSwitchingId]             = useState(null)
   const [removingId, setRemovingId]               = useState(null)
@@ -128,26 +128,16 @@ export default function Connections() {
   const plan       = user?.plan || 'basic'
   const isUnlimited = accountsLimit >= 999 || isAdmin
 
-  // Detecta retorno do Facebook OAuth
+  // Detecta retorno do servidor OAuth (?selecting=1) ou erro (?error=...)
+  // O Facebook agora redireciona direto para /api/meta-callback (servidor),
+  // então o React nunca mais recebe ?code= na URL.
   useEffect(() => {
     if (loadingConnection) return
     const searchParams = new URLSearchParams(window.location.search)
-    const connected   = searchParams.get('connected')
-    const errCode     = searchParams.get('error')
-    const code        = searchParams.get('code')
-    const state       = searchParams.get('state')
-    const selecting   = searchParams.get('selecting')
-
-    // Facebook retornou o code — encaminha para o handler server-side
-    if (code && state) {
-      setProcessingReturn(true)
-      const qs = new URLSearchParams({ code, state }).toString()
-      window.location.replace(`/api/meta-callback?${qs}`)
-      return
-    }
+    const errCode   = searchParams.get('error')
+    const selecting = searchParams.get('selecting')
 
     // Server salvou PENDING e redirecionou aqui — busca contas disponíveis
-    // Aguarda user estar disponível antes de limpar a URL e chamar a API
     if (selecting) {
       if (!user) return
       window.history.replaceState(null, '', window.location.pathname)
@@ -166,10 +156,10 @@ export default function Connections() {
       return
     }
 
-    if (connected || errCode || window.location.hash.includes('access_token')) {
+    if (errCode) {
       window.history.replaceState(null, '', window.location.pathname)
+      setLocalError(errCode)
     }
-    if (errCode) setLocalError(errCode)
   }, [loadingConnection, user])
 
   const handleAddAccount = async () => {
