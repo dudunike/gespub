@@ -11,6 +11,10 @@ const MIGRATIONS = [
   `ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS insights_used_month int DEFAULT 0`,
   `ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS insights_reset_at   timestamptz DEFAULT NOW()`,
   `ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url      text`,
+  `ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_plan_check`,
+  `ALTER TABLE public.profiles ADD CONSTRAINT profiles_plan_check CHECK (plan = ANY (ARRAY['starter','basic','pro','advanced','enterprise']))`,
+  `ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_status_check`,
+  `ALTER TABLE public.profiles ADD CONSTRAINT profiles_status_check CHECK (status = ANY (ARRAY['active','inactive','blocked']))`,
   `NOTIFY pgrst, 'reload schema'`,
 ]
 

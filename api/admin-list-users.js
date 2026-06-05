@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Configuração do servidor incompleta' })
   }
 
-  // Verifica se o chamador é admin
+  // Verifica que o chamador é admin
   const anonClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: auth } } })
   const { data: { user }, error: authErr } = await anonClient.auth.getUser(auth.replace('Bearer ', ''))
   if (authErr || !user) return res.status(401).json({ error: 'Não autorizado' })
@@ -25,38 +25,82 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Acesso negado (requer admin)' })
   }
 
-  // Busca todos os perfis (exceto admins)
-  const { data: profiles, error: profilesErr } = await adminClient
-    .from('profiles')
-    .select('*')
-    .neq('role', 'admin')
-    .order('created_at', { ascending: false })
+  // Busca todos os profiles e todos os usuários do auth em paralelo
+  const [profilesRes, authRes] = await Promise.all([
+    adminClient.from('profiles').select('*').order('created_at', { ascending: false }),
+    adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+  ])
 
-  if (profilesErr) return res.status(500).json({ error: profilesErr.message })
+  const profiles  = profilesRes.data ?? []
+  const authUsers = authRes.data?.users ?? []
 
-  // Busca todos os usuários do auth para cruzar o email
-  const { data: authData } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
-  const emailMap = {}
-  for (const u of authData?.users ?? []) {
-    emailMap[u.id] = u.email
+  // Mapa rápido de id → auth user (para email)
+  const authMap = {}
+  for (const u of authUsers) authMap[u.id] = u
+
+  // Mapa de id → profile existente
+  const profileMap = {}
+  for (const p of profiles) profileMap[p.id] = p
+
+  // Une: auth users que não são admin e que têm ou não profile
+  const nonAdminAuthUsers = authUsers.filter(u => {
+    const p = profileMap[u.id]
+    return !p || p.role !== 'admin'
+  })
+
+  // Cria profiles stub para usuários do auth sem profile (não bloqueia a exibição)
+  const stubs = []
+  for (const u of nonAdminAuthUsers) {
+    if (!profileMap[u.id]) {
+      const name = u.user_metadata?.name || u.email?.split('@')[0] || 'Sem nome'
+      await adminClient.from('profiles').upsert({
+        id:     u.id,
+        name,
+        role:   'user',
+        plan:   'basic',
+        status: 'active',
+      }).then(() => {})
+
+      stubs.push({
+        id:     u.id,
+        name,
+        role:   'user',
+        plan:   'basic',
+        status: 'active',
+        email:  u.email,
+        agents_used: 0, accounts_used: 0, rules_used: 0, campaigns_used: 0, insights_used: 0,
+        plan_start_at: null, plan_expires_at: null,
+      })
+    }
   }
 
-  // Enriquece cada perfil com email e contagens de uso
-  const enriched = await Promise.all((profiles ?? []).map(async (p) => {
-    const [ag, ac] = await Promise.all([
-      adminClient.from('agents').select('id', { count: 'exact', head: true }).eq('user_id', p.id),
-      adminClient.from('meta_connections').select('id', { count: 'exact', head: true }).eq('user_id', p.id),
-    ])
-    return {
-      ...p,
-      email:          emailMap[p.id] || null,
-      agents_used:    ag.count   || 0,
-      accounts_used:  ac.count   || 0,
-      rules_used:     0,
-      campaigns_used: 0,
-      insights_used:  p.insights_used_month || 0,
-    }
-  }))
+  // Enriquece profiles existentes com email e contagens de uso
+  const enriched = await Promise.all(
+    profiles
+      .filter(p => p.role !== 'admin')
+      .map(async (p) => {
+        const [ag, ac] = await Promise.all([
+          adminClient.from('agents').select('id', { count: 'exact', head: true }).eq('user_id', p.id),
+          adminClient.from('meta_connections').select('id', { count: 'exact', head: true }).eq('user_id', p.id),
+        ])
+        return {
+          ...p,
+          email:         authMap[p.id]?.email ?? null,
+          agents_used:   ag.count  ?? 0,
+          accounts_used: ac.count  ?? 0,
+          rules_used:    0,
+          campaigns_used: 0,
+          insights_used: p.insights_used_month ?? 0,
+        }
+      })
+  )
 
-  return res.status(200).json({ users: enriched })
+  // Junta profiles enriquecidos + stubs, mais recentes primeiro
+  const all = [...enriched, ...stubs].sort((a, b) => {
+    const da = a.created_at ? new Date(a.created_at) : new Date(0)
+    const db = b.created_at ? new Date(b.created_at) : new Date(0)
+    return db - da
+  })
+
+  return res.status(200).json({ users: all })
 }
