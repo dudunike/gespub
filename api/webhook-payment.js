@@ -15,22 +15,15 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-const PLAN_MAP = {
-  // Mapeie os IDs de produto/plano da sua plataforma de pagamento para os planos do GesPub
-  starter:    'starter',
-  pro:        'pro',
-  enterprise: 'enterprise',
-  // Hotmart
-  starter_hotmart:    'starter',
-  pro_hotmart:        'pro',
-  enterprise_hotmart: 'enterprise',
-}
 
 function parsePlan(rawPlan = '') {
   const lower = rawPlan.toLowerCase()
-  if (lower.includes('enterprise')) return 'enterprise'
-  if (lower.includes('pro'))        return 'pro'
-  return 'starter'
+  if (lower.includes('enterprise'))                                         return 'enterprise'
+  if (lower.includes('advanced') || lower.includes('avan'))                 return 'advanced'
+  if (lower.includes('pro'))                                                return 'pro'
+  if (lower.includes('basic') || lower.includes('basico') || lower.includes('básico')) return 'basic'
+  if (lower.includes('starter'))                                            return 'starter'
+  return 'basic'
 }
 
 function addDays(date, days) {
@@ -124,7 +117,7 @@ export default async function handler(req, res) {
 
   if (action === 'activate') {
     // Verifica se usuário já existe
-    const { data: { users }, error: listErr } = await supabase.auth.admin.listUsers()
+    const { data: { users } } = await supabase.auth.admin.listUsers()
     const existing = users?.find(u => u.email === email)
 
     let userId

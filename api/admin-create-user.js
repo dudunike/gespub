@@ -39,12 +39,30 @@ export default async function handler(req, res) {
     user_metadata: { name: form.name }
   })
 
-  if (createError) return res.status(400).json({ error: createError.message })
+  let targetUserId
 
-  const newUserId = newUser.user.id
+  if (createError) {
+    const alreadyExists =
+      createError.message?.toLowerCase().includes('already registered') ||
+      createError.message?.toLowerCase().includes('already been registered') ||
+      createError.status === 422
+
+    if (!alreadyExists) return res.status(400).json({ error: createError.message })
+
+    // User exists in auth.users — find them and just upsert the profile
+    const { data: usersData, error: listError } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    if (listError) return res.status(500).json({ error: listError.message })
+
+    const existingUser = usersData?.users?.find(u => u.email === form.email)
+    if (!existingUser) return res.status(400).json({ error: createError.message })
+
+    targetUserId = existingUser.id
+  } else {
+    targetUserId = newUser.user.id
+  }
 
   const { error: profileError } = await adminClient.from('profiles').upsert({
-    id:              newUserId,
+    id:              targetUserId,
     name:            form.name,
     role:            'user',
     plan:            form.plan,
@@ -55,5 +73,5 @@ export default async function handler(req, res) {
 
   if (profileError) return res.status(500).json({ error: profileError.message })
 
-  return res.status(200).json({ success: true, user: newUser.user })
+  return res.status(200).json({ success: true, user: newUser?.user ?? { id: targetUserId, email: form.email } })
 }

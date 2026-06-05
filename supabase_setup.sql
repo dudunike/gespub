@@ -118,7 +118,21 @@ create policy "Usuário gerencia próprias notificações"
   using (auth.uid() = user_id);
 
 -- ============================================================
--- 5. Coluna de avatar na tabela profiles
+-- 5. Coluna de email na tabela profiles
+-- Execute separadamente se profiles já existir
+-- ============================================================
+
+alter table profiles
+  add column if not exists email text;
+
+-- Backfill: copia email de auth.users para perfis existentes sem email
+update profiles p
+set email = u.email
+from auth.users u
+where p.id = u.id and p.email is null;
+
+-- ============================================================
+-- 6. Coluna de avatar na tabela profiles
 -- Execute separadamente se profiles já existir
 -- ============================================================
 

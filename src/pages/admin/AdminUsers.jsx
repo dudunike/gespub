@@ -304,25 +304,16 @@ export default function AdminUsers() {
   const loadUsers = useCallback(async () => {
     setLoading(true)
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .neq('role', 'admin')
-        .order('created_at', { ascending: false })
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin-list-users', {
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Erro ao carregar usuários')
 
-      if (data) {
-        // Enriquece cada perfil com contagens de uso
-        const enriched = await Promise.all(data.map(async (u) => {
-          const [ag, ac] = await Promise.all([
-            supabase.from('agents').select('id', { count: 'exact', head: true }).eq('user_id', u.id),
-            supabase.from('meta_connections').select('id', { count: 'exact', head: true }).eq('user_id', u.id),
-          ])
-          return { ...u, agents_used: ag.count || 0, accounts_used: ac.count || 0, rules_used: 0, campaigns_used: 0, insights_used: u.insights_used_month || 0 }
-        }))
-
-        setUsers(enriched)
-        setExpiringCount(enriched.filter(u => { const d = daysUntil(u.plan_expires_at); return d !== null && d >= 0 && d <= 3 }).length)
-      }
+      const list = result.users ?? []
+      setUsers(list)
+      setExpiringCount(list.filter(u => { const d = daysUntil(u.plan_expires_at); return d !== null && d >= 0 && d <= 3 }).length)
     } catch (e) {
       console.warn(e)
     } finally {
@@ -455,7 +446,13 @@ export default function AdminUsers() {
           onChange={(e) => setSearch(e.target.value)}
           className="px-3 py-2 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-56" />
         <Select name="planFilter" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}
-          options={[{ id: 'basic', label: 'Básico' }, { id: 'pro', label: 'Pro' }, { id: 'advanced', label: 'Avançado' }]}
+          options={[
+            { id: 'starter',    label: 'Starter' },
+            { id: 'basic',      label: 'Básico' },
+            { id: 'pro',        label: 'Pro' },
+            { id: 'advanced',   label: 'Avançado' },
+            { id: 'enterprise', label: 'Enterprise' },
+          ]}
           placeholder="Todos os planos" />
         <Select name="statusFilter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
           options={STATUS_OPTIONS} placeholder="Todos os status" />
@@ -465,11 +462,11 @@ export default function AdminUsers() {
 
       {/* Resumo de planos + MRR */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {['basic', 'pro', 'advanced', 'enterprise'].map(p => {
+        {['starter', 'basic', 'pro', 'advanced', 'enterprise'].map(p => {
           const count  = users.filter(u => u.plan === p && u.status === 'active').length
           const info   = getPlan(p)
           const mrr    = count * info.price
-          if (count === 0 && p === 'enterprise') return null
+          if (count === 0 && (p === 'enterprise' || p === 'starter')) return null
           return (
             <div key={p} className="bg-white border border-border rounded-card px-4 py-3">
               <div className="flex items-center justify-between mb-1">
@@ -484,7 +481,7 @@ export default function AdminUsers() {
         <div className="bg-brand-50 border border-brand-100 rounded-card px-4 py-3">
           <p className="text-xs font-medium text-brand-500 uppercase tracking-wide mb-1">MRR Total</p>
           <p className="text-xl font-bold text-brand-500">
-            R$ {['basic','pro','advanced'].reduce((s, p) => {
+            R$ {['basic','pro','advanced','enterprise'].reduce((s, p) => {
               const count = users.filter(u => u.plan === p && u.status === 'active').length
               return s + count * (getPlan(p).price || 0)
             }, 0).toFixed(2).replace('.', ',')}
