@@ -118,7 +118,7 @@ export default function Connections() {
   const [saving, setSaving]                       = useState(false)
   const [processingReturn, setProcessingReturn]   = useState(() => {
     const sp = new URLSearchParams(window.location.search)
-    return !!(sp.get('code') || sp.get('selecting'))
+    return !!(sp.get('code') || sp.get('selecting') || sp.get('connected'))
   })
   const [switchingId, setSwitchingId]             = useState(null)
   const [removingId, setRemovingId]               = useState(null)
@@ -135,7 +135,7 @@ export default function Connections() {
     const errCode   = searchParams.get('error')
     const code      = searchParams.get('code')
     const state     = searchParams.get('state')
-    const selecting = searchParams.get('selecting')
+    const connected = searchParams.get('connected')
 
     // Facebook retornou o code — encaminha para o handler server-side.
     // detectSessionInUrl: false no Supabase garante que ele não intercepta este ?code=
@@ -146,10 +146,17 @@ export default function Connections() {
       return
     }
 
-    if (isConnected || errCode || window.location.hash.includes('access_token')) {
+    // Servidor salvou as contas e redirecionou aqui — limpa URL, encerra loading
+    if (connected) {
       window.history.replaceState(null, '', window.location.pathname)
+      setProcessingReturn(false)
+      return
     }
-    if (errCode) setLocalError(errCode)
+
+    if (errCode) {
+      window.history.replaceState(null, '', window.location.pathname)
+      setLocalError(decodeURIComponent(errCode))
+    }
   }, [loadingConnection, user])
 
   const handleAddAccount = async () => {

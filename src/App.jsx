@@ -32,6 +32,10 @@ import AdminSettings from './pages/admin/AdminSettings'
 // Rota protegida — redireciona para login se não autenticado
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
+  // Permite acesso quando voltando do OAuth do Facebook (code+state na URL).
+  // detectSessionInUrl: false no Supabase garante que o código não é interceptado.
+  const sp = new URLSearchParams(window.location.search)
+  if (sp.get('code') && sp.get('state')) return children
   if (!isAuthenticated) return <Navigate to="/" replace />
   return children
 }

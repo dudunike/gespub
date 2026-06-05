@@ -127,44 +127,56 @@ export default async function handler(req, res) {
 
     // ── Busca as contas de anúncio do usuário ─────────────────────────────
     const accountsRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,currency&access_token=${accessToken}`
+      `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,name,account_id,currency,account_status&limit=50&access_token=${accessToken}`
     )
     const accountsData = await accountsRes.json()
+
+    if (accountsData.error) {
+      console.error('[meta-callback] Meta API error:', accountsData.error)
+      return redirectTo(`/conexoes?error=${encodeURIComponent(accountsData.error.message || 'Erro ao buscar contas no Facebook')}`)
+    }
+
     const accounts = accountsData.data || []
 
     if (accounts.length === 0) {
-      return redirectTo('/conexoes?error=Nenhuma conta de anúncios encontrada neste perfil do Facebook')
+      return redirectTo('/conexoes?error=' + encodeURIComponent('Nenhuma conta de anúncios encontrada neste perfil do Facebook. Verifique se você tem acesso a uma conta de anúncios.'))
     }
 
-    // Busca o plano do usuário (para limites)
-    const { data: userData } = await supabase.from('users').select('plan, role').eq('id', user.id).single()
-    const planLimits = { basic: 1, pro: 3, advanced: 10, enterprise: 999, starter: 2 }
-    const limit = userData?.role === 'admin' ? 999 : (planLimits[userData?.plan || 'basic'] || 1)
+    // Busca o plano do usuário via tabela profiles (não users)
+    const { data: profile } = await supabase.from('profiles').select('plan, role').eq('id', user.id).single()
+    const planLimits = { starter: 1, basic: 1, pro: 3, advanced: 5, enterprise: 999 }
+    const isAdmin = profile?.role === 'admin'
+    const limit = isAdmin ? 999 : (planLimits[profile?.plan || 'basic'] || 1)
 
     // Seleciona as contas até o limite do plano
     const accountsToConnect = accounts.slice(0, limit)
 
-    // Desativa TODAS as conexões atuais do usuário para garantir que apenas a nova seja ativa
+    // Desativa TODAS as conexões atuais do usuário
     await supabase.from('meta_connections').update({ is_active: false }).eq('user_id', user.id)
 
+    // Remove PENDING antigo se existir
+    await supabase.from('meta_connections').delete().eq('user_id', user.id).eq('account_id', 'PENDING')
+
+    // Salva cada conta, verificando erros explicitamente
     for (let i = 0; i < accountsToConnect.length; i++) {
       const account = accountsToConnect[i]
-      const isActive = (i === 0) // Define a primeira como ativa por padrão
+      const isActive = (i === 0)
 
-      // Verifica se a conexão já existe para evitar erros de constraint com upsert
+      // Verifica se a conexão já existe
       const { data: existing } = await supabase.from('meta_connections')
-        .select('id').eq('user_id', user.id).eq('account_id', account.id).single()
+        .select('id').eq('user_id', user.id).eq('account_id', account.id).maybeSingle()
 
       if (existing) {
-        await supabase.from('meta_connections').update({
+        const { error: updateErr } = await supabase.from('meta_connections').update({
           access_token: accessToken,
           account_name: account.name,
           currency: account.currency || 'BRL',
           connected_at: new Date().toISOString(),
           is_active: isActive
         }).eq('id', existing.id)
+        if (updateErr) console.error('[meta-callback] Update error:', updateErr.message)
       } else {
-        await supabase.from('meta_connections').insert({
+        const { error: insertErr } = await supabase.from('meta_connections').insert({
           user_id: user.id,
           access_token: accessToken,
           account_id: account.id,
@@ -173,13 +185,14 @@ export default async function handler(req, res) {
           connected_at: new Date().toISOString(),
           is_active: isActive
         })
+        if (insertErr) {
+          console.error('[meta-callback] Insert error:', insertErr.message)
+          return redirectTo(`/conexoes?error=${encodeURIComponent('Erro ao salvar conta: ' + insertErr.message)}`)
+        }
       }
     }
 
-    // Remove qualquer PENDING antigo (caso exista de tentativas anteriores)
-    await supabase.from('meta_connections').delete().eq('user_id', user.id).eq('account_id', 'PENDING')
-
-    console.log(`[meta-callback] ✅ Conectado: ${user.email} → ${accountsToConnect.length} contas adicionadas automaticamente.`)
+    console.log(`[meta-callback] ✅ Conectado: ${user.email} → ${accountsToConnect.length} conta(s) salva(s).`)
     return redirectTo('/conexoes?connected=1')
 
   } catch (err) {
