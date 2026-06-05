@@ -128,7 +128,7 @@ export default async function handler(req, res) {
       account_name: account.name,
       currency: account.currency || 'BRL',
       connected_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
+    }, { onConflict: 'user_id,account_id' })
 
     if (dbErr) {
       console.error('[meta-callback] DB save error:', dbErr.message)
