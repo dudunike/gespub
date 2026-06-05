@@ -50,12 +50,66 @@ function StatusChip({ status }) {
   )
 }
 
-// Preview visual do criativo com fallback rico
+// Extrai a melhor URL de imagem disponível a partir do criativo Meta.
+// A Meta retorna vários campos com resoluções diferentes:
+//   - thumbnail_url: sempre baixa resolução (~64-128px) — NÃO usar como primária
+//   - image_url: resolução média (~720px)
+//   - object_story_spec.link_data.image_url / .picture: resolução boa
+//   - object_story_spec.link_data.child_attachments[].image_url: carrossel alta res
+//   - object_story_spec.video_data.image_url: thumbnail do vídeo em boa res
+//   - asset_feed_spec.images[].url/hash: imagens do catálogo
+function getBestImageUrl(creative, type) {
+  if (!creative) return null
+
+  const story = creative.object_story_spec || {}
+  const linkData = story.link_data || {}
+  const videoData = story.video_data || {}
+  const photoData = story.photo_data || {}
+  const feedSpec = creative.asset_feed_spec || {}
+
+  // Para vídeos: priorizar capa do vídeo em alta res
+  if (type === 'video') {
+    return (
+      videoData.image_url ||         // capa HD do vídeo
+      creative.image_url ||          // imagem do criativo
+      linkData.picture ||            // picture do link
+      creative.thumbnail_url ||      // último recurso
+      null
+    )
+  }
+
+  // Para carrossel: usar primeira imagem do child_attachments
+  if (type === 'carousel') {
+    const children = linkData.child_attachments || []
+    const firstChild = children[0]
+    if (firstChild) {
+      return firstChild.image_url || firstChild.picture || creative.image_url || creative.thumbnail_url || null
+    }
+  }
+
+  // Para imagem: priorizar fontes de alta resolução
+  // link_data.image_url é geralmente a imagem original em alta res
+  // link_data.picture pode ser uma versão redimensionada
+  // creative.image_url pode ser resolução média
+  // creative.thumbnail_url é sempre baixa resolução
+  return (
+    linkData.image_url ||            // imagem original do link (alta res)
+    photoData.url ||                 // imagem direta da foto
+    linkData.picture ||              // picture do link
+    creative.image_url ||            // imagem do criativo (resolução média)
+    // asset_feed_spec pode ter imagens em catálogos dinâmicos
+    feedSpec.images?.[0]?.url ||
+    creative.thumbnail_url ||        // último recurso — baixa resolução
+    null
+  )
+}
+
+// Preview visual do criativo com qualidade máxima
 function AdPreview({ url, type, name, size = 'full' }) {
   const [err, setErr] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const isSmall = size === 'sm'
-  // Full: aspect-video (16:9) com fundo preto — imagens Meta são geralmente 1.91:1 ou 1:1.
-  // object-contain evita esticar/borrar; object-cover apenas no thumb pequeno.
+
   const cls = isSmall
     ? 'w-14 h-14 rounded-lg shrink-0 overflow-hidden bg-gray-100'
     : 'w-full aspect-video overflow-hidden bg-gray-950'
@@ -68,6 +122,8 @@ function AdPreview({ url, type, name, size = 'full' }) {
   const grad = gradients[type] || gradients.image
 
   if (url && !err) {
+    // Para imagens: object-contain preserva proporção sem cortar/borrar
+    // Para vídeos e thumbs pequenos: object-cover para preencher o espaço
     const imgCls = isSmall
       ? 'w-full h-full object-cover'
       : type === 'video'
@@ -76,12 +132,19 @@ function AdPreview({ url, type, name, size = 'full' }) {
 
     return (
       <div className={`relative ${cls}`}>
+        {/* Skeleton enquanto carrega */}
+        {!loaded && !isSmall && (
+          <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+        )}
         <img
           src={url}
           alt={name}
-          className={imgCls}
+          className={`${imgCls} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
           loading="lazy"
           decoding="async"
+          // Dicas para o navegador carregar em melhor qualidade
+          sizes={isSmall ? '56px' : '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw'}
+          onLoad={() => setLoaded(true)}
           onError={() => setErr(true)}
         />
         {type === 'video' && !isSmall && (
@@ -186,12 +249,10 @@ export default function Ads() {
     const status      = ad.effective_status || ad.status
     const creative    = ad.creative || {}
     const type        = detectAdType(creative)
-    // Para imagem/carrossel usa image_url (alta res); para vídeo usa thumbnail_url
-    const storySpec = creative.object_story_spec || {}
-    const linkPicture = storySpec.link_data?.picture || storySpec.video_data?.image_url || null
-    const thumbnailUrl = type === 'video'
-      ? (creative.thumbnail_url || creative.image_url || linkPicture || null)
-      : (creative.image_url || linkPicture || creative.thumbnail_url || null)
+
+    // Extrai a melhor URL de imagem disponível (prioriza alta resolução)
+    const thumbnailUrl = getBestImageUrl(creative, type)
+
     const spend        = Number(ins.spend        || 0)
     const impressions  = Number(ins.impressions  || 0)
     const clicks       = Number(ins.clicks       || 0)

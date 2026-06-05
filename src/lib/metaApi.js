@@ -171,16 +171,20 @@ export async function getAds(accountId) {
 }
 
 // Busca anúncios com criativos (thumbnail, imagem, vídeo, tipo)
+// Pede campos extras para obter imagens em alta resolução
 export async function getAdsWithCreatives(accountId) {
   const creativeFields = [
     'thumbnail_url',
     'image_url',
+    'image_hash',
     'video_id',
     'object_type',
     'body',
     'title',
     'call_to_action_type',
     'object_story_spec',
+    'asset_feed_spec',
+    'effective_object_story_id',
   ].join(',')
 
   const data = await apiFetch(`/${accountId}/ads`, {
