@@ -22,23 +22,35 @@ export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const fetchProfile = async (userId, email) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+  const fetchProfile = async (userId, email, retries = 2) => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
 
-      if (error) {
-        console.warn('Perfil não encontrado na tabela profiles:', error.message)
+        if (error) {
+          console.warn(`[Auth] Perfil não encontrado (tentativa ${attempt + 1}/${retries + 1}):`, error.message)
+          if (attempt < retries) {
+            await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+            continue
+          }
+          return null
+        }
+        console.log('[Auth] Perfil carregado — role:', data.role)
+        return { ...data, email }
+      } catch (e) {
+        console.warn(`[Auth] Erro ao buscar perfil (tentativa ${attempt + 1}):`, e)
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+          continue
+        }
         return null
       }
-      return { ...data, email }
-    } catch (e) {
-      console.warn('Erro ao buscar perfil:', e)
-      return null
     }
+    return null
   }
 
   useEffect(() => {
@@ -46,8 +58,9 @@ export function AuthProvider({ children }) {
 
     // Garante que loading seja removido mesmo se Supabase não responder
     const fallbackTimer = setTimeout(() => {
+      console.warn('[Auth] Timeout de 8s atingido — removendo loading')
       if (isMounted) setLoading(false)
-    }, 5000)
+    }, 8000)
 
     const initAuth = async () => {
       try {
@@ -96,14 +109,16 @@ export function AuthProvider({ children }) {
               setUser(profile)
               setIsAuthenticated(true)
             }
+            clearTimeout(fallbackTimer)
+            setLoading(false)
           }
         })()
       } else if (isMounted) {
         setUser(null)
         setIsAuthenticated(false)
+        clearTimeout(fallbackTimer)
+        setLoading(false)
       }
-      clearTimeout(fallbackTimer)
-      if (isMounted) setLoading(false)
     })
 
     return () => {
