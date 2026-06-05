@@ -4,7 +4,7 @@ import {
   IconRobot, IconSettings, IconPlus, IconTrash,
   IconLock, IconX, IconCheck, IconAlertCircle,
   IconPlugConnected, IconChevronDown, IconChevronUp,
-  IconHistory, IconPlayerPlay,
+  IconHistory, IconPlayerPlay, IconSparkles
 } from '@tabler/icons-react'
 import Toggle from '../../components/ui/Toggle'
 import Badge from '../../components/ui/Badge'
@@ -308,7 +308,13 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
             <div className="space-y-5">
               {/* Métricas monitoradas */}
               <div>
-                <p className="text-sm font-semibold text-txt-primary mb-2">Métricas monitoradas</p>
+                <p className="text-sm font-semibold text-txt-primary mb-2">Métricas monitoradas pela Inteligência Artificial</p>
+                <div className="flex items-start gap-2 mb-3 px-3 py-2.5 bg-brand-50 rounded-input border border-brand-100">
+                  <IconSparkles size={16} className="text-brand-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-txt-secondary leading-relaxed">
+                    <strong className="text-brand-700">Atenção:</strong> As métricas que você selecionar aqui serão ativamente estudadas pela nossa IA para gerar <strong className="text-brand-700">Insights e Sugestões</strong> automáticas para melhorar suas campanhas.
+                  </p>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {METRICS.map(m => (
                     <button
@@ -357,8 +363,8 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
                         {METRICS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                       </select>
                       <select value={rule.operator} onChange={e => updateRule(i, 'operator', e.target.value)}
-                        className="w-20 px-2 py-2 text-sm bg-white border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30">
-                        <option value="">Op.</option>
+                        className="flex-1 min-w-[170px] px-2 py-2 text-sm bg-white border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30">
+                        <option value="">Operador</option>
                         {OPERATORS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                       </select>
                       <input type="text" value={rule.value} onChange={e => updateRule(i, 'value', e.target.value)}

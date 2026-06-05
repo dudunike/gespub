@@ -78,13 +78,13 @@ export const METRICS = [
   { id: 'conversions', label: 'Conversões' },
 ]
 
-// Operadores para regras
+// Operadores para regras (linguagem natural para leigos)
 export const OPERATORS = [
-  { id: 'gte', label: '≥', description: 'maior ou igual a' },
-  { id: 'lte', label: '≤', description: 'menor ou igual a' },
-  { id: 'gt', label: '>', description: 'maior que' },
-  { id: 'lt', label: '<', description: 'menor que' },
-  { id: 'eq', label: '=', description: 'igual a' },
+  { id: 'gt', label: 'Estiver acima de' },
+  { id: 'lt', label: 'Estiver abaixo de' },
+  { id: 'gte', label: 'For maior ou igual a' },
+  { id: 'lte', label: 'For menor ou igual a' },
+  { id: 'eq', label: 'For exatamente' },
 ]
 
 // Ações automáticas das regras

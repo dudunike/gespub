@@ -81,7 +81,7 @@ export default function Rules() {
 
     setSaving(true)
     setError(null)
-    const operatorSymbols = { gt: '>', lt: '<', gte: '≥', lte: '≤', eq: '=' }
+    const operatorSymbols = { gt: 'estiver acima de', lt: 'estiver abaixo de', gte: 'for maior ou igual a', lte: 'for menor ou igual a', eq: 'for exatamente' }
     const metricLabels = { roas: 'ROAS', cpa: 'CPA', ctr: 'CTR', cpc: 'CPC', frequency: 'Frequência', budget_remaining: 'Orçamento restante', conversions: 'Conversões', impressions: 'Impressões' }
     const actionLabels = { increase_budget: 'Aumentar orçamento', decrease_budget: 'Reduzir orçamento', pause_ad: 'Pausar anúncio', pause_campaign: 'Pausar campanha', send_notification: 'Enviar notificação' }
     
@@ -89,7 +89,7 @@ export default function Rules() {
     const opLabel = OPERATORS.find(o => o.id === formData.operator)?.label || operatorSymbols[formData.operator] || formData.operator
     const actionLabel = RULE_ACTIONS.find(a => a.id === formData.action)?.label || actionLabels[formData.action] || formData.action
     
-    const conditionStr = `SE ${metricLabel} ${opLabel} ${formData.value} → ${actionLabel}${formData.actionValue ? ' em ' + formData.actionValue : ''}`
+    const conditionStr = `SE ${metricLabel} ${opLabel.toLowerCase()} ${formData.value} → ${actionLabel}${formData.actionValue ? ' em ' + formData.actionValue : ''}`
     
     const payload = {
       user_id: user.id,
@@ -277,7 +277,7 @@ export default function Rules() {
             <div className="flex flex-wrap items-center gap-2 p-4 bg-surface-bg rounded-input border border-border">
               <span className="text-sm font-medium text-brand-500">SE</span>
               <Select name="metric" value={formData.metric} onChange={handleFormChange('metric')} options={METRICS} placeholder="Métrica" className="flex-1 min-w-[120px]" />
-              <Select name="operator" value={formData.operator} onChange={handleFormChange('operator')} options={OPERATORS} placeholder="Op." className="w-20" />
+              <Select name="operator" value={formData.operator} onChange={handleFormChange('operator')} options={OPERATORS} placeholder="Op." className="flex-1 min-w-[170px]" />
               <Input name="value" value={formData.value} onChange={handleFormChange('value')} placeholder="Valor" className="w-24" />
               <span className="text-sm font-medium text-brand-500">→</span>
               <Select name="action" value={formData.action} onChange={handleFormChange('action')} options={RULE_ACTIONS} placeholder="Ação" className="flex-1 min-w-[150px]" />
