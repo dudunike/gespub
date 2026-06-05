@@ -124,42 +124,27 @@ export default async function handler(req, res) {
       return redirectTo('/conexoes?error=Token não recebido do Facebook')
     }
 
-    // ── Busca as contas de anúncio do usuário ─────────────────────────────
-    const accountsRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,currency`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
-    const accountsData = await accountsRes.json()
-    const accounts = accountsData.data || []
-
-    if (accounts.length === 0) {
-      return redirectTo('/conexoes?error=Nenhuma conta de anúncios encontrada neste perfil do Facebook')
-    }
-
-    // Auto-seleciona a primeira conta (mais comum: usuário tem apenas 1)
-    const account = accounts[0]
-
-    // Desativa outras conexões para garantir que a nova seja a ativa
+    // Desativa outras conexões para garantir que a nova PENDING seja a ativa
     await supabase.from('meta_connections').update({ is_active: false }).eq('user_id', user.id)
 
-    // ── Salva a conexão no Supabase ───────────────────────────────────────
+    // ── Salva o token temporariamente como PENDING ───────────────────────
     const { error: dbErr } = await supabase.from('meta_connections').upsert({
       user_id: user.id,
       access_token: accessToken,
-      account_id: account.id,
-      account_name: account.name,
-      currency: account.currency || 'BRL',
+      account_id: 'PENDING',
+      account_name: 'Selecionando Conta...',
+      currency: 'BRL',
       connected_at: new Date().toISOString(),
       is_active: true,
     }, { onConflict: 'user_id,account_id' })
 
     if (dbErr) {
       console.error('[meta-callback] DB save error:', dbErr.message)
-      return redirectTo(`/conexoes?error=${encodeURIComponent('Erro ao salvar conexão: ' + dbErr.message)}`)
+      return redirectTo(`/conexoes?error=${encodeURIComponent('Erro ao salvar token: ' + dbErr.message)}`)
     }
 
-    console.log(`[meta-callback] ✅ Conectado: ${user.email} → ${account.name} (${account.id})`)
-    return redirectTo('/conexoes?connected=1')
+    console.log(`[meta-callback] ✅ Token recebido para: ${user.email}. Redirecionando para seleção.`)
+    return redirectTo('/conexoes?selecting=1')
 
   } catch (err) {
     console.error('[meta-callback] Unexpected error:', err)

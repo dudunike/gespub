@@ -131,9 +131,22 @@ export default function Connections() {
     const errCode = searchParams.get('error')
     const code = searchParams.get('code')
     const state = searchParams.get('state')
+    const selecting = searchParams.get('selecting')
     
     if (code && state) {
       window.location.href = `/api/meta-callback?code=${code}&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(window.location.origin + '/conexoes')}`
+      return
+    }
+
+    if (selecting) {
+      window.history.replaceState(null, '', window.location.pathname)
+      setStep('selecting')
+      getAdAccounts()
+        .then(accs => {
+          if (!accs.length) { setLocalError('Nenhuma conta de anúncios encontrada.'); return }
+          setAvailableAccounts(accs)
+        })
+        .catch(err => setLocalError(err.message))
       return
     }
 

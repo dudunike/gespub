@@ -41,14 +41,16 @@ export function MetaProvider({ children }) {
 
       if (!active) return
 
-      if (!data || data.length === 0) {
+      const validData = data.filter(c => c.account_id !== 'PENDING')
+
+      if (validData.length === 0) {
         setConnections([])
         setLoadingConnection(false)
         return
       }
 
       // Garante que exatamente uma conexão está ativa
-      const activeConn = data.find(c => c.is_active) || data[0]
+      const activeConn = validData.find(c => c.is_active) || validData[0]
 
       // Valida token da conexão ativa (agora via proxy, sem precisar passar token)
       const isValid = await checkTokenValid()
@@ -68,13 +70,13 @@ export function MetaProvider({ children }) {
           setError('Sua conexão com a Meta expirou. Reconecte sua conta.')
         }
       } else {
-        if (!data.some(c => c.is_active)) {
+        if (!validData.some(c => c.is_active)) {
           await supabase.from('meta_connections')
             .update({ is_active: true })
-            .eq('id', data[0].id)
-          data[0] = { ...data[0], is_active: true }
+            .eq('id', validData[0].id)
+          validData[0] = { ...validData[0], is_active: true }
         }
-        setConnections(data)
+        setConnections(validData)
       }
       setLoadingConnection(false)
     }

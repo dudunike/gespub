@@ -72,7 +72,8 @@ export default async function handler(req, res) {
       limit = defaults[planId] || 1
     }
 
-    if (existingConns && existingConns.length >= limit) {
+    const validConns = existingConns ? existingConns.filter(c => c.account_id !== 'PENDING') : []
+    if (validConns.length >= limit) {
       return res.status(403).json({ error: `Limite do plano atingido: máximo de ${limit} contas` })
     }
 
@@ -81,6 +82,7 @@ export default async function handler(req, res) {
     if (!activeConn || !activeConn.access_token) return res.status(400).json({ error: 'Nenhuma conexão ativa para reaproveitar token' })
     
     await supabase.from('meta_connections').update({ is_active: false }).eq('user_id', user.id)
+    
     const { data, error: err } = await supabase.from('meta_connections').upsert({
       user_id: user.id,
       access_token: activeConn.access_token,
@@ -91,6 +93,9 @@ export default async function handler(req, res) {
       is_active: true
     }, { onConflict: 'user_id,account_id' }).select('id, user_id, account_id, account_name, currency, connected_at, is_active').single()
     
+    // Remove a conexão PENDING temporária, se existir
+    await supabase.from('meta_connections').delete().eq('user_id', user.id).eq('account_id', 'PENDING')
+
     if (err) return res.status(500).json({ error: err.message })
     return res.status(200).json(data)
   }
