@@ -506,7 +506,7 @@ function AgentCard({ agent, isUser, isTemplate, onEdit, onToggle, onDelete, onUs
 // ─────────────────────────────────────────────
 export default function Agents() {
   const { user } = useAuth()
-  const { isConnected, accountName, accessToken, accountId } = useMeta()
+  const { isConnected, accountName, accountId } = useMeta()
 
   const [userAgents,    setUserAgents]    = useState([])
   const [campaigns,     setCampaigns]     = useState([])
@@ -565,13 +565,13 @@ export default function Agents() {
 
   // Carregar campanhas do Meta para seleção de escopo
   useEffect(() => {
-    if (!isConnected || !accessToken || !accountId) return
+    if (!isConnected || !accountId) return
     import('../../lib/metaApi').then(({ getCampaigns }) => {
       getCampaigns(accountId)
         .then(data => setCampaigns(data.filter(c => c.effective_status === 'ACTIVE' || c.status === 'ACTIVE')))
         .catch(() => {})
     })
-  }, [isConnected, accessToken, accountId])
+  }, [isConnected, accountId])
 
   const openCreate = () => {
     setEditingAgent(null)

@@ -83,7 +83,7 @@ function BudgetModal({ campaign, onSave, onClose }) {
 
 export default function Campaigns() {
   const navigate = useNavigate()
-  const { isConnected, accessToken, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
+  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
 
   const [campaigns, setCampaigns] = useState([])
   const [insights, setInsights] = useState({})   // campaignId → insight obj
@@ -98,7 +98,7 @@ export default function Campaigns() {
   const [sortDirection, setSortDirection] = useState('desc')
 
   const loadData = useCallback(async () => {
-    if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
+    if (!isConnected || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true)
     setError(null)
     try {
@@ -121,7 +121,7 @@ export default function Campaigns() {
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, activeAccounts, datePreset, timeRange])
+  }, [isConnected, activeAccounts, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 

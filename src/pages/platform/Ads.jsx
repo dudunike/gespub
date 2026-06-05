@@ -109,7 +109,7 @@ function AdPreview({ url, type, name, size = 'full' }) {
 
 export default function Ads() {
   const navigate = useNavigate()
-  const { isConnected, accessToken, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
+  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
 
   const [viewMode, setViewMode]         = useState('grid')
   const [ads, setAds]                   = useState([])
@@ -129,7 +129,7 @@ export default function Ads() {
   const [sortDirection, setSortDirection] = useState('desc')
 
   const loadData = useCallback(async () => {
-    if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
+    if (!isConnected || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true); setError(null)
     try {
       const allAdsRaw = await Promise.all(activeAccounts.map(acc => getAdsWithCreatives(acc.account_id)))
@@ -153,7 +153,7 @@ export default function Ads() {
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, activeAccounts, datePreset, timeRange])
+  }, [isConnected, activeAccounts, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 

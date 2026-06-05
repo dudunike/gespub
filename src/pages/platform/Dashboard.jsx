@@ -54,7 +54,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { isConnected, accessToken, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
+  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
 
   const [insights, setInsights] = useState([])
   const [loading, setLoading] = useState(false)
@@ -67,7 +67,7 @@ export default function Dashboard() {
 
   // Busca insights reais do Meta Ads
   const loadInsights = async () => {
-    if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
+    if (!isConnected || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true)
     setError(null)
     try {
@@ -86,11 +86,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (datePreset === 'custom' && (!timeRange?.since || !timeRange?.until)) return
     loadInsights()
-  }, [isConnected, accessToken, activeAccounts, datePreset, timeRange])
+  }, [isConnected, activeAccounts, datePreset, timeRange])
 
   // Busca seguidores reais do Facebook e Instagram
   useEffect(() => {
-    if (!isConnected || !accessToken) return
+    if (!isConnected) return
     getPageFollowers().then(setFollowers).catch(() => {})
   }, [isConnected])
 

@@ -75,7 +75,7 @@ function BudgetModal({ adSet, onSave, onClose }) {
 
 export default function AdSets() {
   const navigate = useNavigate()
-  const { isConnected, accessToken, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
+  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
 
   const [adSets,     setAdSets]     = useState([])
   const [insights,   setInsights]   = useState({})   // adset_id → insight
@@ -91,7 +91,7 @@ export default function AdSets() {
   const [sortDirection, setSortDirection] = useState('desc')
 
   const loadData = useCallback(async () => {
-    if (!isConnected || !accessToken || !activeAccounts || activeAccounts.length === 0) return
+    if (!isConnected || !activeAccounts || activeAccounts.length === 0) return
     setLoading(true); setError(null)
     try {
       const allAdSetsRaw = await Promise.all(activeAccounts.map(acc => getAdSets(acc.account_id)))
@@ -114,7 +114,7 @@ export default function AdSets() {
     } finally {
       setLoading(false)
     }
-  }, [isConnected, accessToken, activeAccounts, datePreset, timeRange])
+  }, [isConnected, activeAccounts, datePreset, timeRange])
 
   useEffect(() => { loadData() }, [loadData])
 

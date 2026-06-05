@@ -110,7 +110,7 @@ const TYPE_CFG = {
 export default function Insights() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { isConnected, accessToken, accountId, accountName, loadingConnection } = useMeta()
+  const { isConnected, accountId, accountName, loadingConnection } = useMeta()
 
   const [insights,       setInsights]       = useState([])
   const [campaignData,   setCampaignData]   = useState([])
@@ -136,7 +136,7 @@ export default function Insights() {
   }, [user])
 
   const loadInsights = useCallback(async () => {
-    if (!isConnected || !accessToken || !accountId || !canGenerate) return
+    if (!isConnected || !accountId || !canGenerate) return
     setLoading(true); setError(null)
     try {
       const data = await getCampaignInsights(accountId, datePreset)
@@ -199,7 +199,7 @@ export default function Insights() {
       }
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
-  }, [isConnected, accessToken, accountId, datePreset, canGenerate, insightsUsed, user])
+  }, [isConnected, accountId, datePreset, canGenerate, insightsUsed, user])
 
   useEffect(() => { loadInsights() }, [isConnected, accountId, datePreset])
 
