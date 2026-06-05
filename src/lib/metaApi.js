@@ -177,6 +177,7 @@ export async function getAdsWithCreatives(accountId, token) {
     'body',
     'title',
     'call_to_action_type',
+    'object_story_spec',
   ].join(',')
 
   const data = await apiFetch(`/${accountId}/ads`, token, {

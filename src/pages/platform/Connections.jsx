@@ -1,77 +1,147 @@
 import { useState, useEffect } from 'react'
 import {
-  IconBrandFacebook, IconUnlink, IconExternalLink,
-  IconCheck, IconAlertCircle, IconLoader2,
+  IconBrandFacebook, IconExternalLink,
+  IconCheck, IconAlertCircle, IconLoader2, IconRefresh,
+  IconStar, IconTrash, IconPlus, IconArrowsExchange,
+  IconShieldCheck, IconCrown,
 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
 import { useMeta } from '../../context/MetaContext'
+import { useAuth } from '../../context/AuthContext'
 import { getAdAccounts } from '../../lib/metaApi'
 import { formatDateTime } from '../../utils/formatters'
+import { PLAN_BADGE_VARIANT } from '../../utils/planLimits'
+
+const PLAN_LABELS = { basic: 'Básico', pro: 'Pro', advanced: 'Avançado', enterprise: 'Enterprise', starter: 'Starter' }
+
+function PlanBadge({ plan, used, limit, isAdmin }) {
+  const isUnlimited = limit >= 999 || isAdmin
+  const variant = PLAN_BADGE_VARIANT[plan] || 'default'
+  const colors = {
+    default: 'bg-surface-bg text-txt-secondary border-border',
+    brand:   'bg-brand-50 text-brand-600 border-brand-200',
+    success: 'bg-status-successBg text-status-success border-status-success/30',
+  }
+  const cls = colors[variant] || colors.default
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cls}`}>
+      {isAdmin ? <IconShieldCheck size={12} /> : isUnlimited ? <IconCrown size={12} /> : null}
+      {isAdmin
+        ? 'Admin — Ilimitado'
+        : `${PLAN_LABELS[plan] || plan} • ${used}/${isUnlimited ? '∞' : limit} conta${limit !== 1 ? 's' : ''}`
+      }
+    </span>
+  )
+}
+
+function AccountCard({ conn, isActive, onSwitch, onRemove, switching, removing }) {
+  const adManagerUrl = `https://business.facebook.com/adsmanager/manage/campaigns?act=${conn.account_id?.replace('act_', '')}`
+  return (
+    <div className={`rounded-card border p-4 transition-all ${
+      isActive
+        ? 'bg-white border-brand-300 shadow-sm ring-1 ring-brand-200'
+        : 'bg-white border-border hover:border-brand-200'
+    }`}>
+      <div className="flex items-start gap-3">
+        <div className={`w-10 h-10 rounded-card flex items-center justify-center shrink-0 ${
+          isActive ? 'bg-[#1877F2]/15' : 'bg-[#1877F2]/10'
+        }`}>
+          <IconBrandFacebook size={22} className="text-[#1877F2]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-txt-primary truncate">{conn.account_name}</p>
+            {isActive && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-status-successBg text-status-success text-xs font-medium rounded-full">
+                <IconCheck size={11} />
+                Ativa
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 mt-0.5 text-xs text-txt-secondary">
+            <span className="font-mono">{conn.account_id}</span>
+            <span>•</span>
+            <span>{conn.currency}</span>
+          </div>
+          <p className="text-xs text-txt-secondary mt-0.5">
+            Conectado em {formatDateTime(conn.connected_at)}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+        {!isActive && (
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={switching ? IconLoader2 : IconStar}
+            onClick={() => onSwitch(conn.id)}
+            disabled={switching || removing}
+          >
+            {switching ? 'Ativando…' : 'Usar esta conta'}
+          </Button>
+        )}
+        <a href={adManagerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex">
+          <Button size="sm" variant="ghost" icon={IconExternalLink}>
+            Gerenciador
+          </Button>
+        </a>
+        <button
+          onClick={() => onRemove(conn.id)}
+          disabled={switching || removing}
+          className="ml-auto p-1.5 rounded-input text-txt-secondary hover:text-status-error hover:bg-status-errorBg transition-all disabled:opacity-40"
+          title="Remover conta"
+        >
+          {removing
+            ? <IconLoader2 size={15} className="animate-spin" />
+            : <IconTrash size={15} />
+          }
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function Connections() {
+  const { user, isAdmin } = useAuth()
   const {
-    isConnected, connection, loadingConnection,
-    error, setError, startConnectRedirect, saveConnection, disconnect,
+    isConnected, connections, connection, loadingConnection,
+    error, setError,
+    canAddAccount, accountsLimit, accountsUsed,
+    startConnectRedirect, saveConnection, switchConnection,
+    removeConnection, replaceActive,
   } = useMeta()
 
-  const [step, setStep]                       = useState('idle')
+  const [step, setStep]                           = useState('idle')
   const [availableAccounts, setAvailableAccounts] = useState([])
-  const [pendingToken, setPendingToken]       = useState(null)
-  const [localError, setLocalError]           = useState(null)
-  const [saving, setSaving]                   = useState(false)
-  const [disconnecting, setDisconnecting]     = useState(false)
-  const [processingReturn, setProcessingReturn] = useState(false)
+  const [pendingToken, setPendingToken]           = useState(null)
+  const [localError, setLocalError]               = useState(null)
+  const [saving, setSaving]                       = useState(false)
+  const [processingReturn, setProcessingReturn]   = useState(false)
+  const [switchingId, setSwitchingId]             = useState(null)
+  const [removingId, setRemovingId]               = useState(null)
 
-  // Detecta retorno do OAuth (novo fluxo: query params / legado: hash)
+  const plan       = user?.plan || 'basic'
+  const isUnlimited = accountsLimit >= 999 || isAdmin
+
+  // Detecta retorno do Facebook OAuth (token no hash)
   useEffect(() => {
-    // Aguarda loadingConnection terminar para evitar conflito com conexão existente
     if (loadingConnection) return
-
-    const url = new URL(window.location.href)
-
-    // ── Novo fluxo (Authorization Code) — servidor já salvou a conexão ──
-    if (url.searchParams.has('connected')) {
-      window.history.replaceState(null, '', window.location.pathname)
-      // Força reload da conexão no contexto
-      window.location.reload()
-      return
-    }
-
-    if (url.searchParams.has('error')) {
-      const errorMsg = url.searchParams.get('error')
-      setLocalError(decodeURIComponent(errorMsg))
-      window.history.replaceState(null, '', window.location.pathname)
-      return
-    }
-
-    // ── Fluxo legado (Implicit — token no hash) ──────────────────────────
     const hash = window.location.hash
     if (!hash || !hash.includes('access_token')) return
 
-    const params = new URLSearchParams(hash.slice(1))
-    const token  = params.get('access_token')
+    const params  = new URLSearchParams(hash.slice(1))
+    const token   = params.get('access_token')
     const errCode = params.get('error')
-
-    // Limpa o hash da URL (não fica exposto no histórico)
     window.history.replaceState(null, '', window.location.pathname)
 
-    if (errCode) {
-      setLocalError('Autorização negada no Facebook. Tente novamente e aceite as permissões.')
-      return
-    }
-
+    if (errCode) { setLocalError('Autorização negada no Facebook. Tente novamente.'); return }
     if (!token) return
 
     setProcessingReturn(true)
     getAdAccounts(token)
       .then((accounts) => {
-        if (!accounts.length) {
-          setLocalError('Nenhuma conta de anúncios encontrada neste perfil.')
-          return
-        }
-        if (accounts.length === 1) {
-          return saveConnection(token, accounts[0])
-        }
+        if (!accounts.length) { setLocalError('Nenhuma conta de anúncios encontrada neste perfil.'); return }
+        if (accounts.length === 1) return saveConnection(token, accounts[0])
         setPendingToken(token)
         setAvailableAccounts(accounts)
         setStep('selecting')
@@ -81,26 +151,28 @@ export default function Connections() {
   }, [loadingConnection, saveConnection])
 
   const handleSelectAccount = async (account) => {
-    setSaving(true)
-    setLocalError(null)
+    setSaving(true); setLocalError(null)
     try {
       await saveConnection(pendingToken, account)
-      setStep('idle')
-      setAvailableAccounts([])
-      setPendingToken(null)
+      setStep('idle'); setAvailableAccounts([]); setPendingToken(null)
     } catch (err) {
       setLocalError(err.message)
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
-  const handleDisconnect = async () => {
-    setDisconnecting(true)
-    setLocalError(null)
+  const handleSwitch = async (id) => {
+    setSwitchingId(id); setLocalError(null)
+    try { await switchConnection(id) }
+    catch (err) { setLocalError(err.message) }
+    finally { setSwitchingId(null) }
+  }
+
+  const handleRemove = async (id) => {
+    setRemovingId(id); setLocalError(null)
     if (setError) setError(null)
-    await disconnect()
-    setDisconnecting(false)
+    try { await removeConnection(id) }
+    catch (err) { setLocalError(err.message) }
+    finally { setRemovingId(null) }
   }
 
   const displayError = localError || error
@@ -109,9 +181,7 @@ export default function Connections() {
     return (
       <div className="flex flex-col items-center justify-center h-48 gap-3">
         <div className="w-6 h-6 border-2 border-border border-t-brand-500 rounded-full animate-spin" />
-        {processingReturn && (
-          <p className="text-sm text-txt-secondary">Conectando sua conta Meta Ads…</p>
-        )}
+        {processingReturn && <p className="text-sm text-txt-secondary">Conectando sua conta Meta Ads…</p>}
       </div>
     )
   }
@@ -121,16 +191,24 @@ export default function Connections() {
 
       {/* Card Meta Ads */}
       <div className="bg-white border border-border rounded-card p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-14 h-14 bg-[#1877F2]/10 rounded-card flex items-center justify-center shrink-0">
-            <IconBrandFacebook size={32} className="text-[#1877F2]" />
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 bg-[#1877F2]/10 rounded-card flex items-center justify-center shrink-0">
+              <IconBrandFacebook size={32} className="text-[#1877F2]" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-txt-primary">Meta Ads</h2>
+              <p className="text-sm text-txt-secondary mt-1">
+                Conecte seu Gerenciador de Anúncios do Facebook e Instagram para ver
+                campanhas, métricas e fazer edições diretamente pela plataforma.
+              </p>
+            </div>
           </div>
-          <div className="flex-1">
-            <h2 className="text-base font-semibold text-txt-primary">Meta Ads</h2>
-            <p className="text-sm text-txt-secondary mt-1">
-              Conecte seu Gerenciador de Anúncios do Facebook e Instagram para ver
-              campanhas, métricas e fazer edições diretamente pela plataforma.
-            </p>
+          {/* Badge plano */}
+          <div className="shrink-0">
+            <PlanBadge plan={plan} used={accountsUsed} limit={accountsLimit} isAdmin={isAdmin} />
           </div>
         </div>
 
@@ -142,13 +220,10 @@ export default function Connections() {
           </div>
         )}
 
-        {/* Não conectado — botão principal */}
+        {/* Não conectado */}
         {!isConnected && step === 'idle' && (
           <div className="mt-5">
-            <Button
-              onClick={startConnectRedirect}
-              icon={IconBrandFacebook}
-            >
+            <Button onClick={startConnectRedirect} icon={IconBrandFacebook}>
               Conectar com Facebook
             </Button>
             <p className="mt-2 text-xs text-txt-secondary">
@@ -158,7 +233,7 @@ export default function Connections() {
           </div>
         )}
 
-        {/* Seleção de conta */}
+        {/* Picker de conta pós-OAuth */}
         {step === 'selecting' && (
           <div className="mt-5 space-y-3">
             <p className="text-sm font-medium text-txt-primary">Selecione a conta de anúncios:</p>
@@ -183,35 +258,67 @@ export default function Connections() {
           </div>
         )}
 
-        {/* Conectado */}
-        {isConnected && (
-          <div className="mt-5 pt-5 border-t border-border space-y-3">
-            <div className="flex items-center gap-2 text-status-success">
-              <IconCheck size={16} />
-              <span className="text-sm font-medium">Conta conectada</span>
+        {/* Contas conectadas */}
+        {connections.length > 0 && step === 'idle' && (
+          <div className="mt-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-txt-secondary uppercase tracking-wide">
+                Contas conectadas
+              </p>
+              {!isUnlimited && (
+                <span className={`text-xs font-medium ${
+                  accountsUsed >= accountsLimit ? 'text-status-error' : 'text-txt-secondary'
+                }`}>
+                  {accountsUsed}/{accountsLimit} do plano
+                </span>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-              <span className="text-txt-secondary">Conta</span>
-              <span className="font-medium text-txt-primary">{connection.account_name}</span>
-              <span className="text-txt-secondary">ID da conta</span>
-              <span className="font-mono text-xs text-txt-primary">{connection.account_id}</span>
-              <span className="text-txt-secondary">Moeda</span>
-              <span className="text-txt-primary">{connection.currency}</span>
-              <span className="text-txt-secondary">Conectado em</span>
-              <span className="text-txt-primary">{formatDateTime(connection.connected_at)}</span>
-            </div>
-            <div className="pt-2 flex flex-wrap gap-2">
-              <Button
-                variant="secondary" size="sm" icon={IconUnlink}
-                onClick={handleDisconnect} disabled={disconnecting}
-              >
-                {disconnecting ? 'Desconectando…' : 'Desconectar'}
-              </Button>
-              <a href="https://business.facebook.com/adsmanager" target="_blank" rel="noopener noreferrer">
-                <Button variant="ghost" size="sm" icon={IconExternalLink}>
-                  Abrir Gerenciador de Anúncios
+
+            {connections.map((conn) => (
+              <AccountCard
+                key={conn.id}
+                conn={conn}
+                isActive={conn.is_active || conn.id === connection?.id}
+                onSwitch={handleSwitch}
+                onRemove={handleRemove}
+                switching={switchingId === conn.id}
+                removing={removingId === conn.id}
+              />
+            ))}
+
+            {/* Ações de conta */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {/* Pode adicionar mais */}
+              {canAddAccount && (
+                <Button variant="secondary" size="sm" icon={IconPlus} onClick={startConnectRedirect}>
+                  Adicionar conta Meta
                 </Button>
-              </a>
+              )}
+
+              {/* Plano básico (1 conta) — trocar */}
+              {!canAddAccount && accountsLimit === 1 && (
+                <Button variant="secondary" size="sm" icon={IconArrowsExchange} onClick={replaceActive}>
+                  Trocar conta
+                </Button>
+              )}
+
+              {/* Plano multi-conta mas no limite */}
+              {!canAddAccount && accountsLimit > 1 && (
+                <p className="text-xs text-txt-secondary">
+                  Limite de {accountsLimit} contas atingido.{' '}
+                  <span className="text-brand-500 font-medium">Faça upgrade para adicionar mais.</span>
+                </p>
+              )}
+
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={IconRefresh}
+                onClick={startConnectRedirect}
+                className="ml-auto"
+              >
+                Reconectar
+              </Button>
             </div>
           </div>
         )}
