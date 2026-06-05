@@ -139,6 +139,9 @@ export default async function handler(req, res) {
     // Auto-seleciona a primeira conta (mais comum: usuário tem apenas 1)
     const account = accounts[0]
 
+    // Desativa outras conexões para garantir que a nova seja a ativa
+    await supabase.from('meta_connections').update({ is_active: false }).eq('user_id', user.id)
+
     // ── Salva a conexão no Supabase ───────────────────────────────────────
     const { error: dbErr } = await supabase.from('meta_connections').upsert({
       user_id: user.id,
@@ -147,6 +150,7 @@ export default async function handler(req, res) {
       account_name: account.name,
       currency: account.currency || 'BRL',
       connected_at: new Date().toISOString(),
+      is_active: true,
     }, { onConflict: 'user_id,account_id' })
 
     if (dbErr) {
