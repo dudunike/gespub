@@ -111,10 +111,9 @@ export function MetaProvider({ children }) {
     }
     const stateB64 = btoa(JSON.stringify(stateObj))
 
-    const oauthOrigin = window.location.origin.replace('https://www.', 'https://')
     const params = new URLSearchParams({
       client_id:     META_APP_ID,
-      redirect_uri:  `${oauthOrigin}/api/meta-callback`,
+      redirect_uri:  `${window.location.origin}/conexoes`,
       scope:         'ads_management,pages_show_list,pages_read_engagement',
       response_type: 'code',
       state:         stateB64

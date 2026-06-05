@@ -129,7 +129,14 @@ export default function Connections() {
     const searchParams = new URLSearchParams(window.location.search)
     const connected = searchParams.get('connected')
     const errCode = searchParams.get('error')
+    const code = searchParams.get('code')
+    const state = searchParams.get('state')
     
+    if (code && state) {
+      window.location.href = `/api/meta-callback?code=${code}&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(window.location.origin + '/conexoes')}`
+      return
+    }
+
     if (connected || errCode || window.location.hash.includes('access_token')) {
       window.history.replaceState(null, '', window.location.pathname)
     }

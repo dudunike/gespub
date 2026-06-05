@@ -17,7 +17,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
-  const { code, state, error: fbError, error_description } = req.query
+  const { code, state, error: fbError, error_description, redirect_uri: explicitRedirectUri } = req.query
 
   // Dados padrão de retorno
   let returnBase = 'https://www.gespub.online'
@@ -100,8 +100,8 @@ export default async function handler(req, res) {
   // O redirect_uri precisa ser EXATAMENTE o mesmo usado no redirect inicial
   // Normaliza www → non-www para casar com o URI cadastrado no app Meta
   const rawOrigin = stateData.o || `https://${req.headers.host}`
-  const origin = rawOrigin.replace('https://www.', 'https://')
-  const redirectUri = `${origin}/api/meta-callback`
+  const origin = rawOrigin
+  const redirectUri = explicitRedirectUri || `${origin}/api/meta-callback`
 
   try {
     // ── Troca o code por access_token ──────────────────────────────────────
