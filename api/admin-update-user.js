@@ -1,13 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
-import { runMigrations } from './admin-migrate-db.js'
 
-async function updateProfile(adminClient, userId, data, autoMigrated = false) {
+function isSchemaError(msg = '') {
+  return msg.toLowerCase().includes('schema cache') || msg.toLowerCase().includes('column')
+}
+
+async function safeUpdate(adminClient, userId, data) {
   const { error } = await adminClient.from('profiles').update(data).eq('id', userId)
   if (!error) return null
 
-  if (error.message?.toLowerCase().includes('schema cache') && !autoMigrated) {
-    await runMigrations().catch(() => {})
-    return updateProfile(adminClient, userId, data, true)
+  if (isSchemaError(error.message)) {
+    // Colunas extras ausentes — atualiza só plan e status
+    const { error: minErr } = await adminClient.from('profiles').update({
+      plan:   data.plan,
+      status: data.status,
+    }).eq('id', userId)
+    return minErr || null
   }
 
   return error
@@ -36,9 +43,9 @@ export default async function handler(req, res) {
   const { userId, form } = req.body
   if (!userId || !form) return res.status(400).json({ error: 'Dados incompletos' })
 
-  const profileError = await updateProfile(adminClient, userId, {
-    plan:            form.plan,
-    status:          form.status,
+  const profileError = await safeUpdate(adminClient, userId, {
+    plan:            form.plan            || 'basic',
+    status:          form.status          || 'active',
     plan_start_at:   form.plan_start_at   || null,
     plan_expires_at: form.plan_expires_at || null,
   })

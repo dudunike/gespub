@@ -14,7 +14,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { runMigrations } from './admin-migrate-db.js'
 
 
 function parsePlan(rawPlan = '') {
@@ -148,8 +147,8 @@ export default async function handler(req, res) {
       }).catch(() => {})
     }
 
-    // Cria/atualiza perfil com plano e data de expiração (auto-migra se colunas faltarem)
-    const profileData = {
+    // Cria/atualiza perfil com plano e data de expiração
+    const { error: profileErr } = await supabase.from('profiles').upsert({
       id:               userId,
       name:             name || email,
       role:             'user',
@@ -158,15 +157,7 @@ export default async function handler(req, res) {
       plan_start_at:    new Date().toISOString(),
       plan_expires_at:  expiresAt,
       insights_used_month: 0,
-    }
-
-    let { error: profileErr } = await supabase.from('profiles').upsert(profileData)
-
-    if (profileErr?.message?.toLowerCase().includes('schema cache')) {
-      await runMigrations().catch(() => {})
-      const retry = await supabase.from('profiles').upsert(profileData)
-      profileErr = retry.error
-    }
+    })
 
     if (profileErr) {
       console.error('[webhook-payment] Erro ao salvar perfil:', profileErr.message)
