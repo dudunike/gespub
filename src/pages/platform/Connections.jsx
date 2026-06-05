@@ -147,7 +147,9 @@ export default function Connections() {
     }
 
     // Server salvou PENDING e redirecionou aqui — busca contas disponíveis
+    // Aguarda user estar disponível antes de limpar a URL e chamar a API
     if (selecting) {
+      if (!user) return
       window.history.replaceState(null, '', window.location.pathname)
       setProcessingReturn(true)
       getAdAccounts()
@@ -168,7 +170,7 @@ export default function Connections() {
       window.history.replaceState(null, '', window.location.pathname)
     }
     if (errCode) setLocalError(errCode)
-  }, [loadingConnection])
+  }, [loadingConnection, user])
 
   const handleAddAccount = async () => {
     if (connections.length === 0) return startConnectRedirect()
