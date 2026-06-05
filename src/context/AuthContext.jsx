@@ -133,8 +133,17 @@ export function AuthProvider({ children }) {
         return { success: false, error: error.message }
       }
 
-      const basicUser = buildProfileFromSession(data.user)
-      setUser(basicUser)
+      // Busca perfil real imediatamente para ter role correto antes do redirect
+      const profile =
+        (await fetchProfile(data.user.id, data.user.email)) ||
+        buildProfileFromSession(data.user)
+
+      if (profile.status === 'blocked') {
+        await supabase.auth.signOut()
+        return { success: false, error: 'Conta bloqueada. Entre em contato com o suporte.' }
+      }
+
+      setUser(profile)
       setIsAuthenticated(true)
       return { success: true }
     } catch (err) {
