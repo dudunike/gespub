@@ -98,7 +98,9 @@ export default async function handler(req, res) {
   }
 
   // O redirect_uri precisa ser EXATAMENTE o mesmo usado no redirect inicial
-  const origin = stateData.o || `https://${req.headers.host}`
+  // Normaliza www → non-www para casar com o URI cadastrado no app Meta
+  const rawOrigin = stateData.o || `https://${req.headers.host}`
+  const origin = rawOrigin.replace('https://www.', 'https://')
   const redirectUri = `${origin}/api/meta-callback`
 
   try {
