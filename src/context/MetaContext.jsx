@@ -1,5 +1,5 @@
 // Contexto de conexão Meta Ads — suporte a múltiplas contas por plano
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { META_APP_ID } from '../lib/metaSDK'
 import { getAdAccounts, checkTokenValid } from '../lib/metaApi'
@@ -90,18 +90,12 @@ export function MetaProvider({ children }) {
   const activeConnection = connections.find(c => c.is_active) || connections[0] || null
 
   // Múltiplas contas selecionadas
-  const activeAccounts = typeof window !== 'undefined' && React.useMemo ? React.useMemo(() => {
+  const activeAccounts = useMemo(() => {
     if (!connections || connections.length === 0) return []
     if (selectedAccountId === 'all') return connections
     if (selectedAccountId === 'active') return [activeConnection].filter(Boolean)
     return connections.filter(c => c.account_id === selectedAccountId)
-  }, [selectedAccountId, connections, activeConnection]) : (() => {
-    // Fallback caso useMemo não esteja disponível no primeiro render SSR
-    if (!connections || connections.length === 0) return []
-    if (selectedAccountId === 'all') return connections
-    if (selectedAccountId === 'active') return [activeConnection].filter(Boolean)
-    return connections.filter(c => c.account_id === selectedAccountId)
-  })()
+  }, [selectedAccountId, connections, activeConnection])
 
   // Limites do plano — admin sempre tem máximo
   const planLimits = getPlan(user?.plan || 'basic')
