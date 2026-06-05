@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import {
   IconDeviceFloppy, IconWebhook, IconBell,
   IconAlertCircle, IconCheck, IconEye, IconEyeOff,
+  IconPlugConnected, IconLoader2, IconX,
 } from '@tabler/icons-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -20,6 +21,44 @@ function Section({ title, description, children }) {
       {children}
     </div>
   )
+}
+
+const META_TESTS = [
+  {
+    id: 'adaccounts',
+    label: 'Contas de anúncios',
+    permissions: 'ads_read, ads_management',
+    path: '/me/adaccounts',
+    params: { fields: 'id,name,account_status', limit: '5' },
+  },
+  {
+    id: 'pages',
+    label: 'Páginas do Facebook',
+    permissions: 'pages_read_engagement, pages_show_list',
+    path: '/me/accounts',
+    params: { fields: 'id,name', limit: '5' },
+  },
+  {
+    id: 'businesses',
+    label: 'Contas Business',
+    permissions: 'business_management',
+    path: '/me/businesses',
+    params: { fields: 'id,name', limit: '5' },
+  },
+]
+
+async function callProxy(path, params) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sem sessão ativa')
+  const res = await fetch('/api/meta-proxy', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ path, params }),
+  })
+  return res.json()
 }
 
 export default function AdminSettings() {
@@ -40,17 +79,37 @@ export default function AdminSettings() {
   const [systemConfig, setSystemConfig] = useState(SYSTEM_CONFIG)
   const [aiConfig, setAiConfig] = useState({ geminiApiKey: '', geminiModel: 'gemini-2.0-flash' })
   const [aiSaved, setAiSaved] = useState(false)
-  
-  const [isLoading, setIsLoading] = useState(true)
 
+  const [testResults, setTestResults] = useState({})
+  const [testRunning, setTestRunning] = useState(false)
+
+  const runAllTests = async () => {
+    setTestRunning(true)
+    setTestResults({})
+    for (const test of META_TESTS) {
+      setTestResults(prev => ({ ...prev, [test.id]: { status: 'running' } }))
+      try {
+        const data = await callProxy(test.path, test.params)
+        if (data.error) {
+          setTestResults(prev => ({ ...prev, [test.id]: { status: 'error', message: data.error } }))
+        } else {
+          const items = data.data || []
+          setTestResults(prev => ({ ...prev, [test.id]: { status: 'ok', count: items.length, sample: items[0]?.name || items[0]?.id || '—' } }))
+        }
+      } catch (e) {
+        setTestResults(prev => ({ ...prev, [test.id]: { status: 'error', message: e.message } }))
+      }
+    }
+    setTestRunning(false)
+  }
+  
   // Carrega configurações do Supabase
   useEffect(() => {
     async function loadSettings() {
-      setIsLoading(true)
       const { data, error } = await supabase.from('system_settings').select('id, value')
       if (data && !error) {
         const getVal = (id, fallback) => data.find(item => item.id === id)?.value || fallback
-        
+
         const dbPlans = getVal('plan_limits', null)
         if (dbPlans) {
           setPlans([
@@ -65,7 +124,6 @@ export default function AdminSettings() {
         setSystemConfig(getVal('system_config', SYSTEM_CONFIG))
         setAiConfig(getVal('ai_config', aiConfig))
       }
-      setIsLoading(false)
     }
     loadSettings()
   }, [])
@@ -271,6 +329,55 @@ export default function AdminSettings() {
             className="w-full px-3 py-2 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 resize-none" />
         </div>
         <Button icon={IconDeviceFloppy} onClick={async () => { await saveSetting('system_config', systemConfig); Object.assign(SYSTEM_CONFIG, systemConfig); }}>Salvar sistema</Button>
+      </Section>
+
+      {/* TESTE DE INTEGRAÇÃO META */}
+      <Section title="Teste de Integração Meta API" description="Executa as chamadas obrigatórias para verificação do App Review do Facebook. Requer conta Meta conectada.">
+        <div className="space-y-3">
+          {META_TESTS.map((test) => {
+            const r = testResults[test.id]
+            return (
+              <div key={test.id} className={`flex items-start justify-between p-3 rounded-input border gap-3 ${
+                r?.status === 'ok'      ? 'bg-status-successBg border-status-success' :
+                r?.status === 'error'   ? 'bg-status-errorBg border-status-error' :
+                r?.status === 'running' ? 'bg-surface-bg border-border' :
+                                          'bg-surface-bg border-border'
+              }`}>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-txt-primary">{test.label}</p>
+                  <p className="text-xs text-txt-secondary">{test.permissions}</p>
+                  {r?.status === 'ok' && (
+                    <p className="text-xs text-status-success mt-1">
+                      {r.count} registro(s) retornado(s) — ex: <span className="font-medium">{r.sample}</span>
+                    </p>
+                  )}
+                  {r?.status === 'error' && (
+                    <p className="text-xs text-status-error mt-1">{r.message}</p>
+                  )}
+                </div>
+                <div className="shrink-0 mt-0.5">
+                  {r?.status === 'ok'      && <IconCheck size={18} className="text-status-success" />}
+                  {r?.status === 'error'   && <IconX size={18} className="text-status-error" />}
+                  {r?.status === 'running' && <IconLoader2 size={18} className="text-brand-500 animate-spin" />}
+                  {!r && <span className="w-[18px] h-[18px] rounded-full border-2 border-border block" />}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <Button
+          icon={testRunning ? IconLoader2 : IconPlugConnected}
+          onClick={runAllTests}
+          disabled={testRunning}
+        >
+          {testRunning ? 'Testando…' : 'Executar todos os testes'}
+        </Button>
+
+        <p className="text-xs text-txt-secondary">
+          Cada chamada bem-sucedida verifica as permissões correspondentes no App Review do Facebook.
+          Faça o mesmo pelo Graph API Explorer em developers.facebook.com para registrar os testes oficialmente.
+        </p>
       </Section>
     </div>
   )

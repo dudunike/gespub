@@ -32,6 +32,7 @@ export default async function handler(req, res) {
     /^\/me$/,
     /^\/me\/accounts$/,
     /^\/me\/adaccounts$/,
+    /^\/me\/businesses$/,
     /^\/act_[0-9]+$/,
     /^\/act_[0-9]+\/campaigns$/,
     /^\/act_[0-9]+\/adsets$/,
