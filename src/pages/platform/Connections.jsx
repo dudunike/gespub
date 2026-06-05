@@ -118,7 +118,7 @@ export default function Connections() {
   const [saving, setSaving]                       = useState(false)
   const [processingReturn, setProcessingReturn]   = useState(() => {
     const sp = new URLSearchParams(window.location.search)
-    return !!sp.get('selecting')
+    return !!(sp.get('code') || sp.get('selecting'))
   })
   const [switchingId, setSwitchingId]             = useState(null)
   const [removingId, setRemovingId]               = useState(null)
@@ -128,14 +128,23 @@ export default function Connections() {
   const plan       = user?.plan || 'basic'
   const isUnlimited = accountsLimit >= 999 || isAdmin
 
-  // Detecta retorno do servidor OAuth (?selecting=1) ou erro (?error=...)
-  // O Facebook agora redireciona direto para /api/meta-callback (servidor),
-  // então o React nunca mais recebe ?code= na URL.
+  // Detecta retorno do Facebook OAuth ou do servidor
   useEffect(() => {
     if (loadingConnection) return
     const searchParams = new URLSearchParams(window.location.search)
     const errCode   = searchParams.get('error')
+    const code      = searchParams.get('code')
+    const state     = searchParams.get('state')
     const selecting = searchParams.get('selecting')
+
+    // Facebook retornou o code — encaminha para o handler server-side.
+    // detectSessionInUrl: false no Supabase garante que ele não intercepta este ?code=
+    if (code && state) {
+      setProcessingReturn(true)
+      const qs = new URLSearchParams({ code, state }).toString()
+      window.location.replace(`/api/meta-callback?${qs}`)
+      return
+    }
 
     // Server salvou PENDING e redirecionou aqui — busca contas disponíveis
     if (selecting) {

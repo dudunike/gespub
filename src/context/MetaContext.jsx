@@ -123,15 +123,9 @@ export function MetaProvider({ children }) {
     }
     const stateB64 = btoa(JSON.stringify(stateObj))
 
-    // redirect_uri aponta direto para o handler server-side para que o
-    // Facebook nunca envie o código ao React (evita interferência do Supabase).
-    const redirectUri = window.location.hostname === 'localhost'
-      ? `${window.location.origin}/api/meta-callback`
-      : 'https://gespub.online/api/meta-callback'
-
     const params = new URLSearchParams({
       client_id:     META_APP_ID,
-      redirect_uri:  redirectUri,
+      redirect_uri:  'https://gespub.online/conexoes',
       scope:         'ads_management,pages_show_list,pages_read_engagement',
       response_type: 'code',
       state:         stateB64
