@@ -41,7 +41,9 @@ export default async function handler(req, res) {
     /^\/[0-9]+$/, // ID específico (campanha, conjunto, ad)
   ]
 
-  if (path !== '/add-account') {
+  const INTERNAL_PATHS = ['/add-account', '/pending-accounts']
+
+  if (!INTERNAL_PATHS.includes(path)) {
     if (!path.startsWith('/')) return res.status(400).json({ error: 'Path inválido' })
     if (path.includes('..') || path.includes('://')) return res.status(400).json({ error: 'Path malicioso' })
 
