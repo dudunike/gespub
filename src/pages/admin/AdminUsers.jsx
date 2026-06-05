@@ -292,14 +292,17 @@ function CreateUserModal({ onClose, onCreate }) {
 }
 
 export default function AdminUsers() {
-  const [users,        setUsers]        = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [planFilter,   setPlanFilter]   = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [search,       setSearch]       = useState('')
-  const [drawerUser,   setDrawerUser]   = useState(null)
-  const [showCreate,   setShowCreate]   = useState(false)
+  const [users,         setUsers]         = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [planFilter,    setPlanFilter]    = useState('')
+  const [statusFilter,  setStatusFilter]  = useState('')
+  const [search,        setSearch]        = useState('')
+  const [drawerUser,    setDrawerUser]    = useState(null)
+  const [showCreate,    setShowCreate]    = useState(false)
   const [expiringCount, setExpiringCount] = useState(0)
+  const [needsMigration, setNeedsMigration] = useState(false)
+  const [migrating,      setMigrating]      = useState(false)
+  const [migrateError,   setMigrateError]   = useState('')
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -313,23 +316,53 @@ export default function AdminUsers() {
 
       const list = result.users ?? []
       setUsers(list)
+      setNeedsMigration(false)
       setExpiringCount(list.filter(u => { const d = daysUntil(u.plan_expires_at); return d !== null && d >= 0 && d <= 3 }).length)
     } catch (e) {
+      if (e.message?.toLowerCase().includes('schema cache') || e.message?.toLowerCase().includes('column')) {
+        setNeedsMigration(true)
+      }
       console.warn(e)
     } finally {
       setLoading(false)
     }
   }, [])
 
+  const handleMigrate = async () => {
+    setMigrating(true)
+    setMigrateError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin-migrate-db', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        if (result.needsToken) {
+          setMigrateError(`Configure SUPABASE_ACCESS_TOKEN na Vercel (gere em supabase.com/dashboard/account/tokens) e faça redeploy. Ou rode este SQL no Supabase SQL Editor:\n\n${result.sql}`)
+        } else {
+          setMigrateError(result.error || 'Erro desconhecido')
+        }
+        return
+      }
+      await loadUsers()
+    } catch (e) {
+      setMigrateError(e.message)
+    } finally {
+      setMigrating(false)
+    }
+  }
+
   useEffect(() => { loadUsers() }, [loadUsers])
 
   const handleSaveUser = async (userId, form) => {
-    await supabase.from('profiles').update({
-      plan:            form.plan,
-      status:          form.status,
-      plan_start_at:   form.plan_start_at   || null,
-      plan_expires_at: form.plan_expires_at || null,
-    }).eq('id', userId)
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetch('/api/admin-update-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ userId, form }),
+    })
     await loadUsers()
   }
 
@@ -337,76 +370,20 @@ export default function AdminUsers() {
     const { data: { session: adminSession } } = await supabase.auth.getSession()
     if (!adminSession?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
 
-    try {
-      // Tentativa 1: Via API (Seguro e não afeta a sessão do navegador)
-      const res = await fetch('/api/admin-create-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminSession.access_token}`
-        },
-        body: JSON.stringify({ form })
-      })
-
-      const result = await res.json()
-      
-      if (res.ok) {
-        await loadUsers()
-        return
-      }
-
-      // Se falhou por outro motivo que não seja a chave ausente, exibe o erro
-      if (!result.error?.includes('service_key ausente') && !result.error?.includes('Configuração do servidor')) {
-        throw new Error(result.error)
-      }
-    } catch (e) {
-      if (!e.message.includes('service_key ausente') && !e.message.includes('Configuração do servidor')) {
-        throw e
-      }
-    }
-
-    // FALLBACK: Criação pelo Cliente via RAW FETCH
-    // Fazemos um fetch direto para a API do Supabase ignorando o SDK (supabase-js)
-    // Isso impede que o SDK detecte a nova sessão e dispare eventos que deslogam o admin.
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL || ''
-    const ANON_KEY     = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY || ''
-    
-    if (!SUPABASE_URL || !ANON_KEY) {
-      throw new Error('As chaves do Supabase não estão configuradas no frontend.')
-    }
-
-    const signupRes = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    const res = await fetch('/api/admin-create-user', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': ANON_KEY,
+        Authorization: `Bearer ${adminSession.access_token}`,
       },
-      body: JSON.stringify({
-        email: form.email,
-        password: form.password,
-        data: { name: form.name }
-      })
+      body: JSON.stringify({ form }),
     })
 
-    const signupData = await signupRes.json()
+    const result = await res.json()
 
-    if (!signupRes.ok) {
-      throw new Error(signupData.msg || signupData.message || signupData.error_description || 'Erro desconhecido no cadastro')
-    }
-
-    const newUser = signupData.user || signupData
-    if (newUser?.id) {
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id:              newUser.id,
-        name:            form.name,
-        role:            'user',
-        plan:            form.plan,
-        status:          form.status,
-        plan_start_at:   form.plan_start_at   || null,
-        plan_expires_at: form.plan_expires_at || null,
-      })
-
-      if (profileError) throw new Error(profileError.message)
+    if (!res.ok) {
+      if (result.needsMigration) setNeedsMigration(true)
+      throw new Error(result.error || 'Erro ao criar usuário')
     }
 
     await loadUsers()
@@ -437,6 +414,25 @@ export default function AdminUsers() {
           <p className="text-sm text-txt-primary">
             <strong>{expiringCount} usuário{expiringCount !== 1 ? 's' : ''}</strong> com plano vencendo nos próximos 3 dias.
           </p>
+        </div>
+      )}
+
+      {/* Banner de migração de banco de dados */}
+      {needsMigration && (
+        <div className="flex flex-col gap-3 px-4 py-3 bg-status-errorBg border border-status-error rounded-card">
+          <div className="flex items-start gap-3">
+            <IconAlertTriangle size={18} className="text-status-error shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-txt-primary">Banco de dados precisa ser atualizado</p>
+              <p className="text-xs text-txt-secondary mt-0.5">Colunas de plano ausentes na tabela <code>profiles</code>. Clique em "Atualizar banco" para corrigir automaticamente.</p>
+            </div>
+            <Button onClick={handleMigrate} disabled={migrating} variant="secondary">
+              {migrating ? 'Atualizando…' : 'Atualizar banco'}
+            </Button>
+          </div>
+          {migrateError && (
+            <pre className="text-xs text-status-error bg-white border border-status-error rounded p-3 whitespace-pre-wrap break-words">{migrateError}</pre>
+          )}
         </div>
       )}
 

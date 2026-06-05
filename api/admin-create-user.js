@@ -1,4 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
+import { runMigrations } from './admin-migrate-db.js'
+
+const SCHEMA_ERROR = 'schema cache'
+
+async function upsertProfile(adminClient, data, autoMigrated = false) {
+  const { error } = await adminClient.from('profiles').upsert(data)
+  if (!error) return null
+
+  const isSchemaError = error.message?.toLowerCase().includes(SCHEMA_ERROR)
+  if (isSchemaError && !autoMigrated) {
+    await runMigrations().catch(() => {})
+    return upsertProfile(adminClient, data, true)
+  }
+
+  return error
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -18,10 +34,8 @@ export default async function handler(req, res) {
   const { data: { user }, error: authErr } = await anonClient.auth.getUser(auth.replace('Bearer ', ''))
   if (authErr || !user) return res.status(401).json({ error: 'Não autorizado' })
 
-  // Verify if caller is admin
   const adminClient = createClient(supabaseUrl, serviceKey)
   const { data: callerProfile } = await adminClient.from('profiles').select('role').eq('id', user.id).single()
-  
   if (!callerProfile || callerProfile.role !== 'admin') {
     return res.status(403).json({ error: 'Acesso negado (requer cargo de admin)' })
   }
@@ -31,12 +45,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Dados incompletos' })
   }
 
-  // Create user securely via Admin API (does NOT affect the active browser session)
+  // Cria o usuário no auth (não afeta a sessão do navegador)
   const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
     email: form.email,
     password: form.password,
     email_confirm: true,
-    user_metadata: { name: form.name }
+    user_metadata: { name: form.name },
   })
 
   let targetUserId
@@ -49,7 +63,7 @@ export default async function handler(req, res) {
 
     if (!alreadyExists) return res.status(400).json({ error: createError.message })
 
-    // User exists in auth.users — find them and just upsert the profile
+    // Usuário já existe no auth — busca pelo email e apenas atualiza o perfil
     const { data: usersData, error: listError } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
     if (listError) return res.status(500).json({ error: listError.message })
 
@@ -61,7 +75,8 @@ export default async function handler(req, res) {
     targetUserId = newUser.user.id
   }
 
-  const { error: profileError } = await adminClient.from('profiles').upsert({
+  // Monta perfil completo — auto-migra se colunas ainda não existirem no banco
+  const profileError = await upsertProfile(adminClient, {
     id:              targetUserId,
     name:            form.name,
     role:            'user',
@@ -71,7 +86,9 @@ export default async function handler(req, res) {
     plan_expires_at: form.plan_expires_at || null,
   })
 
-  if (profileError) return res.status(500).json({ error: profileError.message })
+  if (profileError) {
+    return res.status(500).json({ error: profileError.message, needsMigration: profileError.message?.toLowerCase().includes(SCHEMA_ERROR) })
+  }
 
   return res.status(200).json({ success: true, user: newUser?.user ?? { id: targetUserId, email: form.email } })
 }
