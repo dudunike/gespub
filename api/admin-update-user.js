@@ -40,8 +40,26 @@ export default async function handler(req, res) {
   const { data: callerProfile } = await adminClient.from('profiles').select('role').eq('id', user.id).single()
   if (!callerProfile || callerProfile.role !== 'admin') return res.status(403).json({ error: 'Acesso negado' })
 
-  const { userId, form } = req.body
-  if (!userId || !form) return res.status(400).json({ error: 'Dados incompletos' })
+  const { userId, form, action } = req.body
+  if (!userId) return res.status(400).json({ error: 'userId obrigatório' })
+
+  // ─── Excluir usuário ───────────────────────────────────────────────────────
+  if (action === 'delete') {
+    // Apaga dados relacionados e depois o usuário do auth
+    await Promise.allSettled([
+      adminClient.from('agents').delete().eq('user_id', userId),
+      adminClient.from('agent_logs').delete().eq('user_id', userId),
+      adminClient.from('meta_connections').delete().eq('user_id', userId),
+      adminClient.from('notifications').delete().eq('user_id', userId),
+    ])
+    await adminClient.from('profiles').delete().eq('id', userId)
+    const { error: delErr } = await adminClient.auth.admin.deleteUser(userId)
+    if (delErr) return res.status(500).json({ error: delErr.message })
+    return res.status(200).json({ ok: true, deleted: true })
+  }
+
+  // ─── Atualizar plano / status ──────────────────────────────────────────────
+  if (!form) return res.status(400).json({ error: 'Dados incompletos' })
 
   const profileError = await safeUpdate(adminClient, userId, {
     plan:            form.plan            || 'basic',

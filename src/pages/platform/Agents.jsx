@@ -4,7 +4,7 @@ import {
   IconRobot, IconSettings, IconPlus, IconTrash,
   IconLock, IconX, IconCheck, IconAlertCircle,
   IconPlugConnected, IconChevronDown, IconChevronUp,
-  IconHistory, IconPlayerPlay, IconSparkles
+  IconHistory, IconPlayerPlay, IconSparkles, IconBrandTabler,
 } from '@tabler/icons-react'
 import Toggle from '../../components/ui/Toggle'
 import Badge from '../../components/ui/Badge'
@@ -62,6 +62,7 @@ const EMPTY_FORM = {
 
 const FREQ_LABELS = { '1h': 'A cada 1h', '6h': 'A cada 6h', '12h': 'A cada 12h', daily: 'A cada 24h' }
 const METRIC_LABELS = { roas: 'ROAS', cpa: 'CPA', ctr: 'CTR', cpc: 'CPC', cpm: 'CPM', frequency: 'Frequência', conversions: 'Conversões', impressions: 'Impressões' }
+const SCOPE_LABELS = { all: 'Todas as campanhas', active_only: 'Só campanhas ativas', specific: 'Campanhas específicas' }
 
 // ─────────────────────────────────────────────
 // Modal centralizado de criação/edição
@@ -256,7 +257,7 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => setForm(p => ({ ...p, scope: s.id }))}
+                      onClick={() => setForm(p => ({ ...p, scope: s.id, scope_items: [] }))}
                       className={`px-3 py-2.5 text-sm rounded-input border transition-all ${
                         form.scope === s.id
                           ? 'bg-brand-50 border-brand-500 text-brand-500 font-medium'
@@ -268,37 +269,67 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
                   ))}
                 </div>
 
-                {/* Campanhas específicas */}
-                {campaigns.length > 0 && (
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      onClick={() => setForm(p => ({ ...p, scope: p.scope === 'specific' ? 'all' : 'specific' }))}
-                      className={`w-full px-3 py-2.5 text-sm rounded-input border transition-all ${
-                        form.scope === 'specific'
-                          ? 'bg-brand-50 border-brand-500 text-brand-500 font-medium'
-                          : 'bg-white border-border text-txt-secondary hover:border-brand-300'
-                      }`}
-                    >
-                      Campanhas específicas
-                    </button>
-                    {form.scope === 'specific' && (
-                      <div className="mt-2 border border-border rounded-input overflow-hidden max-h-40 overflow-y-auto">
-                        {campaigns.map(c => (
-                          <label key={c.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-surface-bg cursor-pointer border-b border-border last:border-0">
-                            <input
-                              type="checkbox"
-                              checked={form.scope_items.includes(c.id)}
-                              onChange={() => toggleCampaign(c.id)}
-                              className="w-4 h-4 rounded border-border text-brand-500 focus:ring-brand-500/30"
-                            />
-                            <span className="text-sm text-txt-primary truncate">{c.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Campanhas específicas (individual ou múltiplas) */}
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, scope: p.scope === 'specific' ? 'all' : 'specific', scope_items: p.scope === 'specific' ? [] : p.scope_items }))}
+                    className={`w-full px-3 py-2.5 text-sm rounded-input border transition-all ${
+                      form.scope === 'specific'
+                        ? 'bg-brand-50 border-brand-500 text-brand-500 font-medium'
+                        : 'bg-white border-border text-txt-secondary hover:border-brand-300'
+                    }`}
+                  >
+                    Campanhas específicas (individual ou múltiplas)
+                  </button>
+
+                  {form.scope === 'specific' && (
+                    <div className="mt-2">
+                      {campaigns.length === 0 ? (
+                        <p className="text-xs text-txt-secondary px-3 py-2 border border-border rounded-input bg-surface-bg">
+                          Nenhuma campanha encontrada. Verifique a conexão com o Meta Ads.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="mb-1.5 flex items-center justify-between">
+                            <p className="text-xs text-txt-secondary">
+                              {form.scope_items.length === 0
+                                ? 'Selecione uma ou mais campanhas'
+                                : `${form.scope_items.length} campanha${form.scope_items.length !== 1 ? 's' : ''} selecionada${form.scope_items.length !== 1 ? 's' : ''}`}
+                            </p>
+                            {form.scope_items.length > 0 && (
+                              <button type="button" onClick={() => setForm(p => ({ ...p, scope_items: [] }))}
+                                className="text-xs text-txt-secondary hover:text-status-error transition-colors">
+                                Limpar
+                              </button>
+                            )}
+                          </div>
+                          <div className="border border-border rounded-input overflow-hidden max-h-48 overflow-y-auto">
+                            {campaigns.map(c => {
+                              const isActive = c.effective_status === 'ACTIVE' || c.status === 'ACTIVE'
+                              return (
+                                <label key={c.id} className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-bg cursor-pointer border-b border-border last:border-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={form.scope_items.includes(c.id)}
+                                    onChange={() => toggleCampaign(c.id)}
+                                    className="w-4 h-4 rounded border-border text-brand-500 focus:ring-brand-500/30 shrink-0"
+                                  />
+                                  <span className="flex-1 text-sm text-txt-primary truncate">{c.name}</span>
+                                  <span className={`text-[10px] shrink-0 px-1.5 py-0.5 rounded-full font-medium ${
+                                    isActive ? 'bg-status-successBg text-status-success' : 'bg-surface-bg text-txt-secondary'
+                                  }`}>
+                                    {isActive ? 'Ativa' : 'Pausada'}
+                                  </span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -428,7 +459,7 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
 // ─────────────────────────────────────────────
 // Card de agente
 // ─────────────────────────────────────────────
-function AgentCard({ agent, isUser, isTemplate, onEdit, onToggle, onDelete, onUseTemplate, deleting }) {
+function AgentCard({ agent, isUser, isTemplate, onEdit, onToggle, onDelete, onUseTemplate, deleting, campaigns = [] }) {
   return (
     <div className={`rounded-2xl p-5 border transition-all ${
       isTemplate
@@ -468,6 +499,36 @@ function AgentCard({ agent, isUser, isTemplate, onEdit, onToggle, onDelete, onUs
         <Badge variant="default">{FREQ_LABELS[agent.frequency] || agent.frequency}</Badge>
         {isUser && <Badge variant="default">{agent.total_executions || 0} exec.</Badge>}
       </div>
+
+      {/* Escopo de atuação */}
+      {isUser && (
+        <div className="mt-2">
+          {agent.scope === 'specific' && agent.scope_items?.length > 0 ? (
+            <div>
+              <p className="text-[10px] font-semibold text-txt-secondary uppercase tracking-wide mb-1">
+                {agent.scope_items.length === 1 ? 'Campanha individual' : `${agent.scope_items.length} campanhas específicas`}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {agent.scope_items.slice(0, 3).map(id => {
+                  const camp = campaigns.find(c => c.id === id)
+                  return (
+                    <span key={id} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-brand-50 text-brand-700 border border-brand-100 truncate max-w-[120px]">
+                      {camp?.name || id}
+                    </span>
+                  )
+                })}
+                {agent.scope_items.length > 3 && (
+                  <span className="text-[10px] text-txt-secondary">+{agent.scope_items.length - 3}</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-[10px] text-txt-secondary">
+              {SCOPE_LABELS[agent.scope] || 'Todas as campanhas'}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Última ação */}
       {isUser && agent.last_action && (
@@ -569,12 +630,12 @@ export default function Agents() {
 
   useEffect(() => { loadAgents() }, [loadAgents])
 
-  // Carregar campanhas do Meta para seleção de escopo
+  // Carregar TODAS as campanhas do Meta para seleção de escopo (ativas e pausadas)
   useEffect(() => {
     if (!isConnected || !accountId) return
     import('../../lib/metaApi').then(({ getCampaigns }) => {
       getCampaigns(accountId)
-        .then(data => setCampaigns(data.filter(c => c.effective_status === 'ACTIVE' || c.status === 'ACTIVE')))
+        .then(data => setCampaigns(data))
         .catch(() => {})
     })
   }, [isConnected, accountId])
@@ -760,6 +821,7 @@ export default function Agents() {
                 key={agent.id}
                 agent={agent}
                 isUser
+                campaigns={campaigns}
                 onEdit={() => openEdit(agent)}
                 onToggle={val => handleToggle(agent.id, val)}
                 onDelete={() => handleDelete(agent.id)}
@@ -771,12 +833,15 @@ export default function Agents() {
       </section>
 
       {/* Histórico de Execuções */}
-      {(logsLoaded || loadingLogs) && (logs.length > 0 || loadingLogs) && (
+      {(logsLoaded || loadingLogs) && (
         <section>
           <div className="flex items-center gap-2 mb-3">
             <IconHistory size={18} className="text-brand-500" stroke={1.5} />
             <h2 className="text-base font-semibold text-txt-primary">Histórico de Execuções</h2>
-            <span className="text-xs text-txt-secondary ml-auto">{loadingLogs ? '…' : `${logs.length} ações recentes`}</span>
+            <button onClick={loadLogs} disabled={loadingLogs} className="ml-1 p-1 rounded text-txt-secondary hover:text-brand-500 transition-colors disabled:opacity-40">
+              <svg className={`w-3.5 h-3.5 ${loadingLogs ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+            </button>
+            <span className="text-xs text-txt-secondary ml-auto">{loadingLogs ? 'carregando…' : `${logs.length} ações recentes`}</span>
           </div>
           <div className="bg-white border border-border rounded-card overflow-hidden">
             {loadingLogs ? (
@@ -784,25 +849,41 @@ export default function Agents() {
                 <div className="w-4 h-4 border-2 border-border border-t-brand-500 rounded-full animate-spin" />
                 Carregando histórico…
               </div>
+            ) : logs.length === 0 ? (
+              <div className="py-10 text-center">
+                <IconHistory size={28} className="text-txt-secondary mx-auto mb-2" strokeWidth={1.5} />
+                <p className="text-sm text-txt-secondary">Nenhuma execução registrada ainda.</p>
+                <p className="text-xs text-txt-secondary mt-1">As ações dos agentes aparecerão aqui com detalhes e horários.</p>
+              </div>
             ) : (
               <div className="divide-y divide-border">
                 {logs.map(log => {
                   const agentName = userAgents.find(a => a.id === log.agent_id)?.name || 'Agente'
+                  const isAI      = log.action === 'ai_analysis'
                   const isPositive = ['increase_budget', 'send_notification'].includes(log.action)
                   const isDanger   = ['pause_campaign', 'pause_ad', 'decrease_budget'].includes(log.action)
                   return (
-                    <div key={log.id} className="px-4 py-3 flex items-start gap-3">
-                      <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
+                    <div key={log.id} className={`px-4 py-3 flex items-start gap-3 ${isAI ? 'bg-brand-50/40' : ''}`}>
+                      <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
+                        isAI       ? 'bg-brand-400' :
                         isDanger   ? 'bg-status-warning' :
                         isPositive ? 'bg-status-success' :
                         'bg-brand-500'
                       }`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-txt-primary truncate">{log.message}</p>
-                        <p className="text-xs text-txt-secondary mt-0.5">
-                          {agentName}
-                          {log.metric_key && ` · ${log.metric_key.toUpperCase()}: ${Number(log.metric_value || 0).toFixed(2)}`}
-                        </p>
+                        <div className="flex items-start gap-1.5">
+                          {isAI && <IconSparkles size={13} className="text-brand-500 shrink-0 mt-0.5" />}
+                          <p className="text-sm text-txt-primary">{log.message}</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                          <span className="text-xs text-txt-secondary">{agentName}</span>
+                          {log.campaign_name && (
+                            <span className="text-xs text-brand-500 font-medium truncate max-w-[160px]">· {log.campaign_name}</span>
+                          )}
+                          {log.metric_key && log.metric_key !== 'ai' && (
+                            <span className="text-xs text-txt-secondary">· {log.metric_key.toUpperCase()}: <span className="font-semibold">{Number(log.metric_value || 0).toFixed(2)}</span></span>
+                          )}
+                        </div>
                       </div>
                       <span className="text-xs text-txt-secondary shrink-0 whitespace-nowrap">
                         {formatRelativeTime(log.executed_at)}

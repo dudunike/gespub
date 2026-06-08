@@ -17,7 +17,7 @@ export const PLAN_LIMITS = {
   basic: {
     id: 'basic',
     name: 'Básico',
-    price: 29.90,
+    price: 27.00,
     accounts: 1,
     agents: 3,
     rules: 3,
@@ -30,7 +30,7 @@ export const PLAN_LIMITS = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    price: 67.90,
+    price: 47.00,
     accounts: 3,
     agents: 10,
     rules: 15,
@@ -43,7 +43,7 @@ export const PLAN_LIMITS = {
   advanced: {
     id: 'advanced',
     name: 'Avançado',
-    price: 147.00,
+    price: 97.00,
     accounts: 5,
     agents: 25,
     rules: 40,
@@ -69,10 +69,9 @@ export const PLAN_LIMITS = {
 }
 
 export const PLAN_OPTIONS = [
-  { id: 'starter',  label: 'Starter — R$ 0,00/mês' },
-  { id: 'basic',    label: 'Básico — R$ 29,90/mês' },
-  { id: 'pro',      label: 'Pro — R$ 67,90/mês' },
-  { id: 'advanced', label: 'Avançado — R$ 147,00/mês' },
+  { id: 'basic',    label: 'Básico — R$ 27,00/mês' },
+  { id: 'pro',      label: 'Pro — R$ 47,00/mês' },
+  { id: 'advanced', label: 'Avançado — R$ 97,00/mês' },
 ]
 
 export let SYSTEM_CONFIG = {

@@ -70,7 +70,6 @@ async function callProxy(path, params) {
 
 export default function AdminSettings() {
   const [plans, setPlans] = useState([
-    { ...PLAN_LIMITS.starter },
     { ...PLAN_LIMITS.basic },
     { ...PLAN_LIMITS.pro },
     { ...PLAN_LIMITS.advanced },
@@ -120,7 +119,6 @@ export default function AdminSettings() {
         const dbPlans = getVal('plan_limits', null)
         if (dbPlans) {
           setPlans([
-            { ...PLAN_LIMITS.starter, ...dbPlans.starter },
             { ...PLAN_LIMITS.basic, ...dbPlans.basic },
             { ...PLAN_LIMITS.pro, ...dbPlans.pro },
             { ...PLAN_LIMITS.advanced, ...dbPlans.advanced },
@@ -145,13 +143,11 @@ export default function AdminSettings() {
     
   const savePlans = async () => {
     const plansObj = {
-      starter: plans.find(p => p.id === 'starter'),
-      basic: plans.find(p => p.id === 'basic'),
-      pro: plans.find(p => p.id === 'pro'),
-      advanced: plans.find(p => p.id === 'advanced')
+      basic:    plans.find(p => p.id === 'basic'),
+      pro:      plans.find(p => p.id === 'pro'),
+      advanced: plans.find(p => p.id === 'advanced'),
     }
     await saveSetting('plan_limits', plansObj)
-    Object.assign(PLAN_LIMITS.starter, plansObj.starter)
     Object.assign(PLAN_LIMITS.basic, plansObj.basic)
     Object.assign(PLAN_LIMITS.pro, plansObj.pro)
     Object.assign(PLAN_LIMITS.advanced, plansObj.advanced)
@@ -307,13 +303,32 @@ export default function AdminSettings() {
       </Section>
 
       {/* IA GLOBAL */}
-      <Section title="Inteligência Artificial Global" description="Chave utilizada pelos Agentes IA e Insights de todos os usuários.">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input label="Google Gemini API Key" name="geminiApiKey" type="password" placeholder="AIza…"
-            value={aiConfig.geminiApiKey || ''} onChange={(e) => setAiConfig(p => ({ ...p, geminiApiKey: e.target.value }))} />
-          <Input label="Modelo padrão" name="geminiModel" placeholder="gemini-2.0-flash"
-            value={aiConfig.geminiModel || ''} onChange={(e) => setAiConfig(p => ({ ...p, geminiModel: e.target.value }))} />
+      <Section title="Inteligência Artificial Global" description="Chaves utilizadas pelos Agentes IA e Insights de todos os usuários.">
+        {/* Gemini */}
+        <div>
+          <p className="text-xs font-semibold text-txt-secondary uppercase tracking-wide mb-3">Google Gemini</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Gemini API Key" name="geminiApiKey" type="password" placeholder="AIza…"
+              value={aiConfig.geminiApiKey || ''} onChange={(e) => setAiConfig(p => ({ ...p, geminiApiKey: e.target.value }))} />
+            <Input label="Modelo Gemini" name="geminiModel" placeholder="gemini-2.0-flash"
+              value={aiConfig.geminiModel || ''} onChange={(e) => setAiConfig(p => ({ ...p, geminiModel: e.target.value }))} />
+          </div>
         </div>
+
+        {/* Claude / Anthropic */}
+        <div className="border-t border-border pt-4">
+          <p className="text-xs font-semibold text-txt-secondary uppercase tracking-wide mb-3">Anthropic Claude</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Claude API Key" name="claudeApiKey" type="password" placeholder="sk-ant-api03-…"
+              value={aiConfig.claudeApiKey || ''} onChange={(e) => setAiConfig(p => ({ ...p, claudeApiKey: e.target.value }))} />
+            <Input label="Modelo Claude" name="claudeModel" placeholder="claude-sonnet-4-6"
+              value={aiConfig.claudeModel || ''} onChange={(e) => setAiConfig(p => ({ ...p, claudeModel: e.target.value }))} />
+          </div>
+          <p className="mt-2 text-xs text-txt-secondary">
+            Modelos disponíveis: <span className="font-mono">claude-opus-4-8</span>, <span className="font-mono">claude-sonnet-4-6</span>, <span className="font-mono">claude-haiku-4-5-20251001</span>
+          </p>
+        </div>
+
         <Button icon={aiSaved ? IconCheck : IconDeviceFloppy} onClick={async () => { await saveSetting('ai_config', aiConfig); setAiSaved(true); setTimeout(() => setAiSaved(false), 2500) }}>
           {aiSaved ? 'Salvo!' : 'Salvar IA'}
         </Button>

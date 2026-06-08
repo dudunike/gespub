@@ -38,7 +38,9 @@ export default async function handler(req, res) {
     /^\/act_[0-9]+\/adsets$/,
     /^\/act_[0-9]+\/ads$/,
     /^\/act_[0-9]+\/insights$/,
-    /^\/[0-9]+$/, // ID específico (campanha, conjunto, ad)
+    /^\/[0-9]+$/,            // ID específico (campanha, conjunto, ad, etc.)
+    /^\/[0-9]+\/media$/,     // Instagram Business Account: listar publicações
+    /^\/[0-9]+\/insights$/,  // Instagram Business Account: métricas da conta
   ]
 
   const INTERNAL_PATHS = ['/add-account', '/pending-accounts']

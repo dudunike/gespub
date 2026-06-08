@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   IconEdit, IconLock, IconLockOpen,
-  IconPlus, IconAlertTriangle, IconX,
+  IconPlus, IconAlertTriangle, IconX, IconTrash, IconAlertCircle,
 } from '@tabler/icons-react'
 import Avatar from '../../components/ui/Avatar'
 import Badge from '../../components/ui/Badge'
@@ -303,6 +303,9 @@ export default function AdminUsers() {
   const [needsMigration, setNeedsMigration] = useState(false)
   const [migrating,      setMigrating]      = useState(false)
   const [migrateError,   setMigrateError]   = useState('')
+  const [deleteTarget,   setDeleteTarget]   = useState(null)   // user a excluir
+  const [deleting,       setDeleting]       = useState(false)
+  const [deleteError,    setDeleteError]    = useState('')
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -395,6 +398,28 @@ export default function AdminUsers() {
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: newStatus } : u))
   }
 
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return
+    setDeleting(true); setDeleteError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Sessão expirada')
+      const res = await fetch('/api/admin-update-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ userId: deleteTarget.id, action: 'delete' }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Erro ao excluir usuário')
+      setUsers(prev => prev.filter(u => u.id !== deleteTarget.id))
+      setDeleteTarget(null)
+    } catch (err) {
+      setDeleteError(err.message)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const filtered = users.filter(u => {
     if (planFilter   && u.plan   !== planFilter)   return false
     if (statusFilter && u.status !== statusFilter)  return false
@@ -443,7 +468,6 @@ export default function AdminUsers() {
           className="px-3 py-2 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-56" />
         <Select name="planFilter" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}
           options={[
-            { id: 'starter',    label: 'Starter' },
             { id: 'basic',      label: 'Básico' },
             { id: 'pro',        label: 'Pro' },
             { id: 'advanced',   label: 'Avançado' },
@@ -458,11 +482,11 @@ export default function AdminUsers() {
 
       {/* Resumo de planos + MRR */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {['starter', 'basic', 'pro', 'advanced', 'enterprise'].map(p => {
+        {['basic', 'pro', 'advanced', 'enterprise'].map(p => {
           const count  = users.filter(u => u.plan === p && u.status === 'active').length
           const info   = getPlan(p)
           const mrr    = count * info.price
-          if (count === 0 && (p === 'enterprise' || p === 'starter')) return null
+          if (count === 0 && p === 'enterprise') return null
           return (
             <div key={p} className="bg-white border border-border rounded-card px-4 py-3">
               <div className="flex items-center justify-between mb-1">
@@ -477,7 +501,7 @@ export default function AdminUsers() {
         <div className="bg-brand-50 border border-brand-100 rounded-card px-4 py-3">
           <p className="text-xs font-medium text-brand-500 uppercase tracking-wide mb-1">MRR Total</p>
           <p className="text-xl font-bold text-brand-500">
-            R$ {['basic','pro','advanced','enterprise'].reduce((s, p) => {
+            R$ {['basic', 'pro', 'advanced', 'enterprise'].reduce((s, p) => {
               const count = users.filter(u => u.plan === p && u.status === 'active').length
               return s + count * (getPlan(p).price || 0)
             }, 0).toFixed(2).replace('.', ',')}
@@ -560,10 +584,17 @@ export default function AdminUsers() {
                         </button>
                         <button
                           onClick={() => toggleBlock(user)}
-                          className={`p-1.5 rounded-input transition-all ${user.status === 'blocked' ? 'text-status-success hover:bg-status-successBg' : 'text-status-error hover:bg-status-errorBg'}`}
+                          className={`p-1.5 rounded-input transition-all ${user.status === 'blocked' ? 'text-status-success hover:bg-status-successBg' : 'text-status-warning hover:bg-status-warningBg'}`}
                           title={user.status === 'blocked' ? 'Reativar acesso' : 'Bloquear acesso'}
                         >
                           {user.status === 'blocked' ? <IconLockOpen size={16} stroke={1.5} /> : <IconLock size={16} stroke={1.5} />}
+                        </button>
+                        <button
+                          onClick={() => { setDeleteTarget(user); setDeleteError('') }}
+                          className="p-1.5 rounded-input text-txt-secondary hover:text-status-error hover:bg-status-errorBg transition-all"
+                          title="Excluir usuário permanentemente"
+                        >
+                          <IconTrash size={16} stroke={1.5} />
                         </button>
                       </div>
                     </td>
@@ -580,6 +611,62 @@ export default function AdminUsers() {
 
       {/* Modal criação */}
       {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} onCreate={handleCreateUser} />}
+
+      {/* Modal de confirmação de exclusão */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-card border border-border w-full max-w-md shadow-2xl">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+              <div className="w-9 h-9 bg-status-errorBg rounded-xl flex items-center justify-center">
+                <IconTrash size={18} className="text-status-error" stroke={1.5} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-txt-primary">Excluir usuário</p>
+                <p className="text-xs text-txt-secondary mt-0.5">Esta ação é <strong>irreversível</strong></p>
+              </div>
+              <button onClick={() => setDeleteTarget(null)} className="ml-auto p-1.5 rounded-input text-txt-secondary hover:bg-surface-bg">
+                <IconX size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="p-3 bg-status-errorBg border border-status-error rounded-input">
+                <div className="flex items-start gap-2">
+                  <IconAlertCircle size={16} className="text-status-error shrink-0 mt-0.5" />
+                  <div className="text-xs text-status-error">
+                    <p className="font-semibold">Você está prestes a excluir permanentemente:</p>
+                    <p className="mt-1 font-bold text-sm">{deleteTarget.name || deleteTarget.email}</p>
+                    <p>{deleteTarget.email}</p>
+                    <p className="mt-1">Isso apagará o perfil, agentes, logs, conexões Meta e a conta de autenticação.</p>
+                  </div>
+                </div>
+              </div>
+
+              {deleteError && (
+                <p className="text-xs text-status-error px-1">{deleteError}</p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2.5 bg-status-error text-white text-sm font-semibold rounded-input hover:bg-red-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {deleting
+                    ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Excluindo…</>
+                    : <><IconTrash size={15} /> Excluir permanentemente</>
+                  }
+                </button>
+                <button
+                  onClick={() => { setDeleteTarget(null); setDeleteError('') }}
+                  className="flex-1 px-4 py-2.5 border border-border text-sm font-medium text-txt-primary rounded-input hover:bg-surface-bg transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

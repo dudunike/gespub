@@ -64,66 +64,24 @@ export default function AdminOverview() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [
-        { count: totalUsers },
-        { count: agentsActive },
-        { data: plans },
-        { data: logs },
-        { data: chartLogs },
-      ] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('agents').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('profiles').select('plan, status'),
-        supabase.from('agent_logs')
-          .select('id, action, message, executed_at, agent_id, user_id, agents(name, user_id)')
-          .order('executed_at', { ascending: false })
-          .limit(15),
-        supabase.from('agent_logs')
-          .select('executed_at, action')
-          .gte('executed_at', new Date(Date.now() - 7 * 86400000).toISOString())
-          .order('executed_at', { ascending: true }),
-      ])
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Sessão expirada')
 
-      // MRR + plan breakdown
-      const activePlans = (plans || []).filter(p => p.status === 'active')
-      const mrr = activePlans.reduce((s, p) => s + (PLAN_LIMITS[p.plan]?.price || 0), 0)
-      const planCount = {}
-      ;(plans || []).forEach(p => { planCount[p.plan] = (planCount[p.plan] || 0) + 1 })
+      const res = await fetch('/api/admin-list-users?action=overview', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Erro ao carregar overview')
+
+      const planCount = d.planCount || {}
       const breakdown = ['basic', 'pro', 'advanced', 'enterprise']
         .filter(k => planCount[k] > 0)
         .map(k => ({ name: PLAN_LIMITS[k]?.name || k, value: planCount[k], color: PLAN_COLORS[k] }))
 
-      // Logs hoje
-      const todayStr = new Date().toISOString().slice(0, 10)
-      const logsToday = (chartLogs || []).filter(l => l.executed_at?.startsWith(todayStr)).length
-
-      // Chart: execuções por dia (últimos 7 dias)
-      const days = {}
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000)
-        const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-        days[key] = 0
-      }
-      ;(chartLogs || []).forEach(l => {
-        const d = new Date(l.executed_at)
-        const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-        if (key in days) days[key]++
-      })
-      const chart = Object.entries(days).map(([dia, total]) => ({ dia, total }))
-
-      // Buscar perfis dos user_ids dos logs separadamente
-      const uids = [...new Set((logs || []).map(l => l.user_id).filter(Boolean))]
-      let profileMap = {}
-      if (uids.length > 0) {
-        const { data: profiles } = await supabase.from('profiles').select('id, name, email').in('id', uids)
-        ;(profiles || []).forEach(p => { profileMap[p.id] = p })
-      }
-      const logsWithProfile = (logs || []).map(l => ({ ...l, profile: profileMap[l.user_id] || null }))
-
-      setStats({ totalUsers: totalUsers || 0, agentsActive: agentsActive || 0, logsToday, mrr })
+      setStats({ totalUsers: d.totalUsers || 0, agentsActive: d.agentsActive || 0, logsToday: d.logsToday || 0, mrr: d.mrr || 0 })
       setPlanBreakdown(breakdown)
-      setExecChart(chart)
-      setRecentLogs(logsWithProfile)
+      setExecChart(d.chartData || [])
+      setRecentLogs(d.recentLogs || [])
     } catch (e) {
       console.warn('AdminOverview load error:', e)
     } finally {

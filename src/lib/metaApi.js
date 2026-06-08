@@ -229,27 +229,134 @@ export async function updateAdStatus(adId, status) {
 
 // ---------- HELPERS ----------
 
+// Descobre o page_id real que uma conta de anúncios utiliza
+async function findPageForAccount(accountId) {
+  // Método 1: Campanhas com promoted_object (mais confiável)
+  try {
+    const campData = await apiFetch(`/${accountId}/campaigns`, {
+      fields: 'promoted_object',
+      limit: 20
+    })
+    for (const camp of (campData.data || [])) {
+      if (camp.promoted_object?.page_id) {
+        return camp.promoted_object.page_id
+      }
+    }
+  } catch (err) {}
+
+  // Método 2: Anúncios com effective_object_story_id (formato pageId_postId)
+  try {
+    const adsData = await apiFetch(`/${accountId}/ads`, {
+      fields: 'effective_object_story_id',
+      limit: 20
+    })
+    for (const ad of (adsData.data || [])) {
+      if (ad.effective_object_story_id) {
+        const pageId = ad.effective_object_story_id.split('_')[0]
+        if (pageId && /^\d+$/.test(pageId)) {
+          return pageId
+        }
+      }
+    }
+  } catch (err) {}
+
+  // Método 3: Criativos com object_story_spec.page_id
+  try {
+    const creativeData = await apiFetch(`/${accountId}/adcreatives`, {
+      fields: 'object_story_spec',
+      limit: 10
+    })
+    for (const c of (creativeData.data || [])) {
+      if (c.object_story_spec?.page_id) {
+        return c.object_story_spec.page_id
+      }
+    }
+  } catch (err) {}
+
+  return null
+}
+
 // Seguidores reais: páginas Facebook + Instagram Business vinculado
-export async function getPageFollowers() {
+export async function getPageFollowers(accountId = null) {
   try {
     const data = await apiFetch('/me/accounts', {
       fields: 'id,name,fan_count,instagram_business_account{id,username,followers_count}',
       limit: 10,
     })
-    const pages = data.data || []
+    let pages = data.data || []
+
+    if (accountId) {
+      const activePageId = await findPageForAccount(accountId)
+
+      if (activePageId) {
+        pages = pages.filter(p => p.id === activePageId)
+      } else {
+        pages = [] // Sem vínculo confirmado, não mostra dados de outra conta
+      }
+    }
+
     let fbFollowers = 0
     let igFollowers = 0
     let igUsername = null
+    let igLinked = false
     pages.forEach((page) => {
       fbFollowers += Number(page.fan_count || 0)
       if (page.instagram_business_account) {
+        igLinked = true
         igFollowers += Number(page.instagram_business_account.followers_count || 0)
         if (!igUsername) igUsername = page.instagram_business_account.username
       }
     })
-    return { fbFollowers, igFollowers, igUsername, pages }
-  } catch {
-    return { fbFollowers: 0, igFollowers: 0, igUsername: null, pages: [] }
+    return { fbFollowers, igFollowers, igUsername, igLinked, pages, loaded: true }
+  } catch (err) {
+    return { fbFollowers: 0, igFollowers: 0, igUsername: null, igLinked: false, pages: [], loaded: false, error: err?.message }
+  }
+}
+
+// Curtidas e comentários nas publicações do Instagram Business vinculado
+// Requer permissão instagram_basic (normalmente incluída no token de negócios)
+export async function getInstagramPostStats(accountId = null) {
+  try {
+    const data = await apiFetch('/me/accounts', {
+      fields: 'id,name,instagram_business_account{id,username,followers_count,media_count}',
+      limit: 10,
+    })
+    let pages = data.data || []
+
+    if (accountId) {
+      const activePageId = await findPageForAccount(accountId)
+
+      if (activePageId) {
+        pages = pages.filter(p => p.id === activePageId)
+      } else {
+        pages = [] // Sem vínculo confirmado, não mostra dados de outra conta
+      }
+    }
+
+    let igId = null, igUsername = null, igFollowers = 0, igMediaCount = 0
+    for (const page of pages) {
+      if (page.instagram_business_account?.id) {
+        igId        = page.instagram_business_account.id
+        igUsername  = page.instagram_business_account.username
+        igFollowers = Number(page.instagram_business_account.followers_count || 0)
+        igMediaCount = Number(page.instagram_business_account.media_count  || 0)
+        break
+      }
+    }
+    if (!igId) return { available: false, reason: 'no_ig_linked' }
+
+    const mediaData = await apiFetch(`/${igId}/media`, {
+      fields: 'id,like_count,comments_count,timestamp,media_type',
+      limit: 12,
+    })
+    const media = mediaData.data || []
+    const totalLikes    = media.reduce((s, m) => s + Number(m.like_count    || 0), 0)
+    const totalComments = media.reduce((s, m) => s + Number(m.comments_count || 0), 0)
+    return { available: true, igId, igUsername, igFollowers, igMediaCount, media, totalLikes, totalComments }
+  } catch (e) {
+    const msg = e.message || ''
+    const reason = msg.includes('190') || msg.includes('permission') || msg.includes('OAuthException') ? 'no_permission' : 'error'
+    return { available: false, reason, error: msg }
   }
 }
 
