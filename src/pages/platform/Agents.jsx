@@ -46,6 +46,24 @@ const DEFAULT_AGENTS = [
     frequency: '12h',
     primary_conversion: 'purchase',
   },
+  {
+    id: 'tpl_escalador',
+    name: 'Escalador de Orçamento',
+    description: 'Aumenta o orçamento das campanhas vencedoras que possuem ROAS alto e CPA abaixo da meta.',
+    function: 'scale_budget',
+    metrics: ['roas', 'cpa', 'budget_remaining'],
+    frequency: '12h',
+    primary_conversion: 'purchase',
+  },
+  {
+    id: 'tpl_fadiga',
+    name: 'Limpador de Fadiga',
+    description: 'Pausa anúncios que já foram vistos muitas vezes sem gerar conversão, evitando saturação do público.',
+    function: 'detect_fatigue',
+    metrics: ['frequency', 'ctr', 'cpm', 'conversions'],
+    frequency: 'daily',
+    primary_conversion: 'link_click',
+  },
 ]
 
 const EMPTY_FORM = {
@@ -225,20 +243,6 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
                 </select>
               </div>
 
-              {/* Objetivo */}
-              <div>
-                <label className="text-sm font-semibold text-txt-primary block mb-1.5">
-                  O que este agente deve fazer?
-                </label>
-                <textarea
-                  value={form.goal_description}
-                  onChange={f('goal_description')}
-                  placeholder="Descreva o objetivo: ex. aumentar conversões no WhatsApp, escalar campanhas com ROAS alto, pausar anúncios com CPA fora do limite..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 resize-none"
-                />
-              </div>
-
               {/* Função + Conversão em 2 colunas */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -389,6 +393,18 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
           {/* ── PASSO 2: Métricas + Regras SE → ENTÃO ── */}
           {step === 2 && (
             <div className="space-y-5">
+              {/* Instruções IA */}
+              <div>
+                <p className="text-sm font-semibold text-txt-primary mb-1.5">Instruções para a Inteligência Artificial</p>
+                <textarea
+                  value={form.goal_description}
+                  onChange={f('goal_description')}
+                  placeholder="Descreva como a IA deve avaliar as métricas abaixo (ex: foque em manter o CPA abaixo de R$ 20, ou escale campanhas com bom ROAS)."
+                  rows={2}
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 resize-none mb-1"
+                />
+              </div>
+
               {/* Métricas monitoradas */}
               <div>
                 <p className="text-sm font-semibold text-txt-primary mb-2">Métricas monitoradas pela Inteligência Artificial</p>
