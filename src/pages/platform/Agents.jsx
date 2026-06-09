@@ -83,6 +83,34 @@ const FREQ_LABELS = { '1h': 'A cada 1h', '6h': 'A cada 6h', '12h': 'A cada 12h',
 const METRIC_LABELS = { roas: 'ROAS', cpa: 'CPA', ctr: 'CTR', cpc: 'CPC', cpm: 'CPM', frequency: 'Frequência', conversions: 'Conversões', impressions: 'Impressões' }
 const SCOPE_LABELS = { all: 'Todas as campanhas', active_only: 'Só campanhas ativas', specific: 'Campanhas específicas' }
 
+const FUNCTION_PRESETS = {
+  optimize_roas: {
+    primary_conversion: 'purchase',
+    metrics: ['roas', 'cpa'],
+    goal_description: 'Sua meta principal é maximizar o Retorno sobre o Investimento (ROAS). Monitore as campanhas de vendas e sugira escalar as que têm ROAS alto e pausar as que dão prejuízo.',
+  },
+  control_cpa: {
+    primary_conversion: 'purchase',
+    metrics: ['cpa', 'conversions'],
+    goal_description: 'Mantenha o custo por aquisição (CPA) abaixo do limite aceitável. Alerte e pause anúncios que estão gastando muito sem gerar conversões.',
+  },
+  detect_fatigue: {
+    primary_conversion: 'link_click',
+    metrics: ['frequency', 'ctr', 'cpm', 'conversions'],
+    goal_description: 'Identifique anúncios que estão sofrendo de fadiga criativa (alta frequência, CTR caindo e CPM subindo). Recomende a pausa dos criativos saturados.',
+  },
+  scale_budget: {
+    primary_conversion: 'purchase',
+    metrics: ['roas', 'cpa', 'budget_remaining'],
+    goal_description: 'Identifique campanhas vencedoras (CPA baixo e ROAS alto) que têm orçamento sobrando e recomende o aumento do orçamento diário para escalar os resultados.',
+  },
+  monitor_ctr: {
+    primary_conversion: 'onsite_conversion.messaging_conversation_started_7d',
+    metrics: ['ctr', 'cpc'],
+    goal_description: 'Monitore o CTR (taxa de cliques) e CPC. Otimize campanhas de mensagens (WhatsApp/Direct) pausando os anúncios que não geram bom engajamento ou cliques baratos.',
+  },
+}
+
 // ─────────────────────────────────────────────
 // Modal centralizado de criação/edição
 // ─────────────────────────────────────────────
@@ -117,6 +145,23 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
     if (newId !== form.ad_account_id) {
       setForm(p => ({ ...p, ad_account_id: newId, scope_items: [] }))
     }
+  }
+
+  const updateFunction = (e) => {
+    const fn = e.target.value
+    setForm(p => {
+      const preset = FUNCTION_PRESETS[fn]
+      if (preset) {
+        return { 
+          ...p, 
+          function: fn, 
+          primary_conversion: preset.primary_conversion, 
+          metrics: preset.metrics, 
+          goal_description: preset.goal_description 
+        }
+      }
+      return { ...p, function: fn }
+    })
   }
 
   const f = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }))
@@ -251,7 +296,7 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
                   </label>
                   <select
                     value={form.function}
-                    onChange={f('function')}
+                    onChange={updateFunction}
                     className="w-full px-3 py-2.5 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 bg-white"
                   >
                     <option value="">Selecione…</option>
