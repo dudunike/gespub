@@ -51,6 +51,7 @@ const DEFAULT_AGENTS = [
 const EMPTY_FORM = {
   name: '',
   goal_description: '',
+  ad_account_id: '',
   function: '',
   primary_conversion: '',
   metrics: [],
@@ -68,6 +69,7 @@ const SCOPE_LABELS = { all: 'Todas as campanhas', active_only: 'Só campanhas at
 // Modal centralizado de criação/edição
 // ─────────────────────────────────────────────
 function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
+  const { connections } = useMeta()
   const [form, setForm] = useState(initialForm || EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -100,6 +102,7 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
 
   const handleSubmit = async () => {
     if (!form.name.trim())     { setError('Informe o nome do agente.'); return }
+    if (!form.ad_account_id)   { setError('Selecione uma conta de anúncio.'); return }
     if (!form.function)        { setError('Selecione a função principal.'); return }
     setSaving(true); setError('')
     try {
@@ -175,6 +178,25 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
                   className="w-full px-3 py-2.5 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
                   autoFocus
                 />
+              </div>
+
+              {/* Conta de Anúncio */}
+              <div>
+                <label className="text-sm font-semibold text-txt-primary block mb-1.5">
+                  Conta de anúncio <span className="text-status-error">*</span>
+                </label>
+                <select
+                  value={form.ad_account_id}
+                  onChange={f('ad_account_id')}
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 bg-white"
+                >
+                  <option value="">Selecione uma conta...</option>
+                  {connections.map(c => (
+                    <option key={c.account_id} value={c.account_id}>
+                      {c.account_name} ({c.account_id})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Objetivo */}
@@ -651,6 +673,7 @@ export default function Agents() {
     setInitialForm({
       name:               agent.name || '',
       goal_description:   agent.goal_description || '',
+      ad_account_id:      agent.ad_account_id || '',
       function:           agent.function || '',
       primary_conversion: agent.primary_conversion || '',
       metrics:            agent.metrics || [],
@@ -668,6 +691,7 @@ export default function Agents() {
       ...EMPTY_FORM,
       name:               tpl.name,
       goal_description:   tpl.description,
+      ad_account_id:      '',
       function:           tpl.function,
       metrics:            tpl.metrics,
       frequency:          tpl.frequency,
@@ -706,6 +730,7 @@ export default function Agents() {
       user_id:            user.id,
       name:               form.name,
       goal_description:   form.goal_description,
+      ad_account_id:      form.ad_account_id,
       function:           form.function,
       primary_conversion: form.primary_conversion,
       metrics:            form.metrics,

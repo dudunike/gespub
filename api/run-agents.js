@@ -459,7 +459,7 @@ export default async function handler(req, res) {
     const [{ data: agents, error: agentsErr }, { data: connections, error: connErr }] =
       await Promise.all([
         agentsQuery,
-        supabase.from('meta_connections').select('user_id, access_token, account_id').eq('is_active', true),
+        supabase.from('meta_connections').select('user_id, access_token, account_id, is_active'),
       ])
 
     if (agentsErr) throw new Error(agentsErr.message)
@@ -468,13 +468,20 @@ export default async function handler(req, res) {
     if (!agents?.length) return res.json({ ok: true, processed: 0, message: 'Nenhum agente ativo' })
 
     const connMap = {}
-    for (const c of connections || []) connMap[c.user_id] = c
+    for (const c of connections || []) {
+      if (!connMap[c.user_id]) connMap[c.user_id] = { all: {}, active: null }
+      connMap[c.user_id].all[c.account_id] = c
+      if (c.is_active) connMap[c.user_id].active = c
+    }
 
     const results = []
     let totalActions = 0
 
     for (const agent of agents) {
-      const conn = connMap[agent.user_id]
+      const userConns = connMap[agent.user_id]
+      if (!userConns) continue
+      
+      const conn = agent.ad_account_id ? userConns.all[agent.ad_account_id] : userConns.active
       if (!conn) continue
       if (!isDue(agent)) continue
 
