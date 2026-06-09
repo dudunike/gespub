@@ -75,6 +75,32 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
   const [error, setError] = useState('')
   const [step, setStep] = useState(1) // 1 = info, 2 = regras
 
+  const [localCampaigns, setLocalCampaigns] = useState([])
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false)
+
+  useEffect(() => {
+    if (!form.ad_account_id) {
+      setLocalCampaigns([])
+      return
+    }
+    let active = true
+    setLoadingCampaigns(true)
+    import('../../lib/metaApi').then(({ getCampaigns }) => {
+      getCampaigns(form.ad_account_id)
+        .then(data => { if (active) setLocalCampaigns(data) })
+        .catch(() => { if (active) setLocalCampaigns([]) })
+        .finally(() => { if (active) setLoadingCampaigns(false) })
+    })
+    return () => { active = false }
+  }, [form.ad_account_id])
+
+  const updateAdAccount = (e) => {
+    const newId = e.target.value
+    if (newId !== form.ad_account_id) {
+      setForm(p => ({ ...p, ad_account_id: newId, scope_items: [] }))
+    }
+  }
+
   const f = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }))
 
   const toggleMetric = (id) =>
@@ -187,7 +213,7 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
                 </label>
                 <select
                   value={form.ad_account_id}
-                  onChange={f('ad_account_id')}
+                  onChange={updateAdAccount}
                   className="w-full px-3 py-2.5 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30 bg-white"
                 >
                   <option value="">Selecione uma conta...</option>
@@ -307,9 +333,13 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
 
                   {form.scope === 'specific' && (
                     <div className="mt-2">
-                      {campaigns.length === 0 ? (
+                      {loadingCampaigns ? (
                         <p className="text-xs text-txt-secondary px-3 py-2 border border-border rounded-input bg-surface-bg">
-                          Nenhuma campanha encontrada. Verifique a conexão com o Meta Ads.
+                          Carregando campanhas...
+                        </p>
+                      ) : localCampaigns.length === 0 ? (
+                        <p className="text-xs text-txt-secondary px-3 py-2 border border-border rounded-input bg-surface-bg">
+                          Nenhuma campanha encontrada na conta de anúncio selecionada.
                         </p>
                       ) : (
                         <>
@@ -327,7 +357,7 @@ function AgentModal({ editingAgent, initialForm, onClose, onSave, campaigns }) {
                             )}
                           </div>
                           <div className="border border-border rounded-input overflow-hidden max-h-48 overflow-y-auto">
-                            {campaigns.map(c => {
+                            {localCampaigns.map(c => {
                               const isActive = c.effective_status === 'ACTIVE' || c.status === 'ACTIVE'
                               return (
                                 <label key={c.id} className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-bg cursor-pointer border-b border-border last:border-0">
