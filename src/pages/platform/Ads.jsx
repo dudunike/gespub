@@ -187,7 +187,7 @@ function AdPreview({ url, type, name, size = 'full' }) {
 
 export default function Ads() {
   const navigate = useNavigate()
-  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
+  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId, currency } = useMeta()
 
   const [viewMode, setViewMode]         = useState('grid')
   const [ads, setAds]                   = useState([])
@@ -549,7 +549,7 @@ export default function Ads() {
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                     <div>
                       <p className="text-txt-secondary">Investido</p>
-                      <p className="font-semibold text-txt-primary">{ad.spend > 0 ? formatCurrency(ad.spend) : '—'}</p>
+                      <p className="font-semibold text-txt-primary">{ad.spend > 0 ? formatCurrency(ad.spend, currency) : '—'}</p>
                     </div>
                     <div>
                       <p className="text-txt-secondary">Impressões</p>
@@ -560,7 +560,7 @@ export default function Ads() {
                       <p className="font-semibold text-txt-primary">
                         <span className={ad.ctr > 3 ? 'text-status-success' : ''}>{ad.ctr > 0 ? formatPercent(ad.ctr) : '—'}</span>
                         <span className="text-txt-secondary font-normal mx-1">•</span>
-                        <span>{ad.cpc > 0 ? formatCurrency(ad.cpc) : '—'}</span>
+                        <span>{ad.cpc > 0 ? formatCurrency(ad.cpc, currency) : '—'}</span>
                       </p>
                     </div>
                     <div>
@@ -575,7 +575,7 @@ export default function Ads() {
                     </div>
                     <div>
                       <p className="text-txt-secondary">CPA</p>
-                      <p className="font-semibold text-txt-primary">{ad.cpa > 0 ? formatCurrency(ad.cpa) : '—'}</p>
+                      <p className="font-semibold text-txt-primary">{ad.cpa > 0 ? formatCurrency(ad.cpa, currency) : '—'}</p>
                     </div>
                   </div>
 
@@ -648,7 +648,7 @@ export default function Ads() {
                       <Badge variant={TYPE_BADGE[ad.type]}>{TYPE_LABELS[ad.type]}</Badge>
                     </td>
                     <td className="px-3 py-3 text-sm font-medium text-txt-primary whitespace-nowrap">
-                      {ad.spend > 0 ? formatCurrency(ad.spend) : '—'}
+                      {ad.spend > 0 ? formatCurrency(ad.spend, currency) : '—'}
                     </td>
                     <td className="px-3 py-3 text-sm text-txt-primary whitespace-nowrap">
                       {ad.impressions > 0 ? formatNumber(ad.impressions) : '—'}
@@ -659,7 +659,7 @@ export default function Ads() {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {ad.cpc > 0 ? formatCurrency(ad.cpc) : '—'}
+                      {ad.cpc > 0 ? formatCurrency(ad.cpc, currency) : '—'}
                     </td>
                     <td className="px-3 py-3 text-sm whitespace-nowrap">
                       <span className={ad.frequency > 3 ? 'text-status-warning font-medium' : 'text-txt-primary'}>
@@ -682,7 +682,7 @@ export default function Ads() {
                       {ad.conversions > 0 ? formatNumber(ad.conversions) : '—'}
                     </td>
                     <td className="px-3 py-3 text-sm font-medium text-txt-primary whitespace-nowrap">
-                      {ad.cpa > 0 ? formatCurrency(ad.cpa) : '—'}
+                      {ad.cpa > 0 ? formatCurrency(ad.cpa, currency) : '—'}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
                       <StatusChip status={ad.status} />
@@ -719,7 +719,7 @@ export default function Ads() {
                 <td className="px-3 py-3 text-sm font-bold text-txt-primary">Totais ({filtered.length})</td>
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3"></td>
-                <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend)}</td>
+                <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend, currency)}</td>
                 <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatNumber(tImp)}</td>
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3"></td>
@@ -727,7 +727,7 @@ export default function Ads() {
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
-                <td className="px-3 py-3 text-sm font-bold text-txt-primary">{tConv > 0 ? formatCurrency(tSpend / tConv) : '—'}</td>
+                <td className="px-3 py-3 text-sm font-bold text-txt-primary">{tConv > 0 ? formatCurrency(tSpend / tConv, currency) : '—'}</td>
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3"></td>
               </tr>

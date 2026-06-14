@@ -75,7 +75,7 @@ function BudgetModal({ adSet, onSave, onClose }) {
 
 export default function AdSets() {
   const navigate = useNavigate()
-  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
+  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId, currency } = useMeta()
 
   const [adSets,     setAdSets]     = useState([])
   const [insights,   setInsights]   = useState({})   // adset_id → insight
@@ -311,13 +311,13 @@ export default function AdSets() {
                           className="flex items-center gap-1 text-sm font-medium text-txt-primary hover:text-brand-500 transition-colors group"
                           title="Clique para editar"
                         >
-                          {formatCurrency(adSet.budget)}
+                          {formatCurrency(adSet.budget, currency)}
                           <IconEdit size={12} className="opacity-0 group-hover:opacity-100" />
                         </button>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-txt-primary whitespace-nowrap">
-                      {adSet.spend > 0 ? formatCurrency(adSet.spend) : '—'}
+                      {adSet.spend > 0 ? formatCurrency(adSet.spend, currency) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
                       {adSet.reach > 0 ? formatNumber(adSet.reach) : '—'}
@@ -333,7 +333,7 @@ export default function AdSets() {
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {adSet.cpc > 0 ? formatCurrency(adSet.cpc) : '—'}
+                      {adSet.cpc > 0 ? formatCurrency(adSet.cpc, currency) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
                       {adSet.totalConvs > 0 ? (
@@ -351,7 +351,7 @@ export default function AdSets() {
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {adSet.cpa > 0 ? (
                         <span className={`font-semibold ${adSet.cpa > 50 ? 'text-status-error' : adSet.cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
-                          {formatCurrency(adSet.cpa)}
+                          {formatCurrency(adSet.cpa, currency)}
                         </span>
                       ) : '—'}
                     </td>
@@ -363,7 +363,7 @@ export default function AdSets() {
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {adSet.cpm > 0 ? formatCurrency(adSet.cpm) : '—'}
+                      {adSet.cpm > 0 ? formatCurrency(adSet.cpm, currency) : '—'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <StatusChip status={adSet.status} />
@@ -417,13 +417,13 @@ export default function AdSets() {
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">Totais ({prepared.length})</td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>
-                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend, currency)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tReach)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tImp)}</td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
-                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpa)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpa, currency)}</td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>

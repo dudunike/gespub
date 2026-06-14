@@ -109,6 +109,13 @@ export function MetaProvider({ children }) {
     return connections.filter(c => c.account_id === selectedAccountId)
   }, [selectedAccountId, connections, activeConnection])
 
+  // Moeda da(s) conta(s) ativa(s) — se todas iguais usa essa, senão usa a primeira
+  const activeCurrency = useMemo(() => {
+    if (!activeAccounts || activeAccounts.length === 0) return activeConnection?.currency || 'BRL'
+    const currencies = [...new Set(activeAccounts.map(a => a.currency).filter(Boolean))]
+    return currencies.length === 1 ? currencies[0] : (activeAccounts[0]?.currency || 'BRL')
+  }, [activeAccounts, activeConnection])
+
   // Limites do plano — admin sempre tem máximo
   const planLimits = getPlan(user?.plan || 'basic')
   const accountsLimit = user?.role === 'admin' ? 999 : (planLimits.accounts || 1)
@@ -237,7 +244,7 @@ export function MetaProvider({ children }) {
     connection:   activeConnection,
     accountId:    activeConnection?.account_id    || null,
     accountName:  activeConnection?.account_name  || null,
-    currency:     activeConnection?.currency      || 'BRL',
+    currency:     activeCurrency,
     selectedAccountId,
     setSelectedAccountId,
     activeAccounts,

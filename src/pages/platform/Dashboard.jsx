@@ -75,13 +75,13 @@ function formatPeriodShort(since, until) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, currency }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white border border-border rounded-input px-3 py-2 text-xs shadow-sm">
         <p className="font-medium text-txt-primary mb-1">{label}</p>
         {payload.map((e, i) => (
-          <p key={i} style={{ color: e.color }}>{e.name}: {formatCurrency(e.value)}</p>
+          <p key={i} style={{ color: e.color }}>{e.name}: {formatCurrency(e.value, currency)}</p>
         ))}
       </div>
     )
@@ -92,7 +92,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
+  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId, currency } = useMeta()
 
   const [insights, setInsights] = useState([])
   const [loading, setLoading] = useState(false)
@@ -207,7 +207,7 @@ export default function Dashboard() {
   const canDownloadReport = ['pro', 'advanced', 'enterprise'].includes(user?.plan)
 
   const openClientReport = () => {
-    const fC  = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const fC  = (v) => formatCurrency(Number(v || 0), currency)
     const fN  = (v) => Number(v || 0).toLocaleString('pt-BR')
 
     const { since, until } = getActualDateRange(datePreset, timeRange)
@@ -513,7 +513,7 @@ ${hasMultiAccounts ? `
   const openReport = () => {
     if (!canDownloadReport || insights.length === 0) return
 
-    const fC  = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const fC  = (v) => formatCurrency(Number(v || 0), currency)
     const fN  = (v) => Number(v || 0).toLocaleString('pt-BR')
     const fP  = (v) => `${Number(v || 0).toFixed(2)}%`
 
@@ -957,7 +957,7 @@ tr:last-child td{border-bottom:none}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <MetricCard
           label="Valor investido"
-          value={formatCurrency(totalSpend)}
+          value={formatCurrency(totalSpend, currency)}
           sub={`${insights.length} campanha${insights.length !== 1 ? 's' : ''}`}
           loading={loading}
         />
@@ -970,7 +970,7 @@ tr:last-child td{border-bottom:none}
         <MetricCard
           label="Impressões"
           value={formatNumber(totalImpressions)}
-          sub={`CPM ${avgCpm > 0 ? formatCurrency(avgCpm) : '—'}`}
+          sub={`CPM ${avgCpm > 0 ? formatCurrency(avgCpm, currency) : '—'}`}
           loading={loading}
         />
         <MetricCard
@@ -985,7 +985,7 @@ tr:last-child td{border-bottom:none}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <MetricCard
           label="CPC (custo/clique)"
-          value={avgCpc > 0 ? formatCurrency(avgCpc) : '—'}
+          value={avgCpc > 0 ? formatCurrency(avgCpc, currency) : '—'}
           loading={loading}
         />
         <MetricCard
@@ -1005,13 +1005,13 @@ tr:last-child td{border-bottom:none}
         <MetricCard
           label="ROAS"
           value={roas > 0 ? formatRoas(roas) : '—'}
-          sub={totalRevenue > 0 ? `Receita ${formatCurrency(totalRevenue)}` : 'Sem valor de compra rastreado'}
+          sub={totalRevenue > 0 ? `Receita ${formatCurrency(totalRevenue, currency)}` : 'Sem valor de compra rastreado'}
           highlight={roas >= 3}
           loading={loading}
         />
         <MetricCard
           label="CPA (custo/resultado)"
-          value={cpa > 0 ? formatCurrency(cpa) : '—'}
+          value={cpa > 0 ? formatCurrency(cpa, currency) : '—'}
           sub={totalConversions > 0 ? `${formatNumber(totalConversions)} resultados` : undefined}
           loading={loading}
         />
@@ -1211,7 +1211,7 @@ tr:last-child td{border-bottom:none}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-semibold text-txt-primary">{formatCurrency(spend)}</p>
+                      <p className="text-sm font-semibold text-txt-primary">{formatCurrency(spend, currency)}</p>
                       {r > 0 && (
                         <p className={`text-xs font-medium ${r >= 3 ? 'text-status-success' : r >= 2 ? 'text-txt-secondary' : 'text-status-error'}`}>
                           ROAS {formatRoas(r)}
@@ -1359,8 +1359,8 @@ tr:last-child td{border-bottom:none}
               <BarChart data={chartData} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E4E4E7" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#71717A', fontSize: 11 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717A', fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip content={<CustomTooltip />} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717A', fontSize: 11 }} tickFormatter={(v) => formatCurrency(v / 1000, currency).replace(/,\d+$/, '') + 'k'} />
+                <Tooltip content={<CustomTooltip currency={currency} />} />
                 <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: '12px', color: '#71717A' }} />
                 <Bar dataKey="Investido" fill="#DDD6FE" radius={[4, 4, 0, 0]} maxBarSize={36} />
                 <Bar dataKey="Receita"   fill="#7C3AED" radius={[4, 4, 0, 0]} maxBarSize={36} />

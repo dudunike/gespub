@@ -24,7 +24,7 @@ import {
 import { getPlan, checkLimit } from '../../utils/planLimits'
 import { formatCurrency, formatRoas, formatPercent, formatNumber } from '../../utils/formatters'
 
-function generateInsights(campInsights) {
+function generateInsights(campInsights, currency = 'BRL') {
   const list = []
   campInsights.forEach((c) => {
     const spend  = Number(c.spend || 0)
@@ -48,22 +48,22 @@ function generateInsights(campInsights) {
     if (roas >= 4) {
       list.push({ id:`roas_high_${c.campaign_id}`, type:'opportunity',
         title:`ROAS de ${formatRoas(roas)} — escale o investimento`, campaignName:name, campaignId:c.campaign_id,
-        analysis:`"${name}" tem ROAS de ${formatRoas(roas)} ${cpa>0?`com CPA de ${formatCurrency(cpa)}`:''}. Aumentar o orçamento em 20-30% pode ampliar os resultados sem comprometer a eficiência.`,
-        metrics:[{label:'ROAS',value:formatRoas(roas)},{label:'Investido',value:formatCurrency(spend)},{label:'Receita',value:revenue>0?formatCurrency(revenue):'—'},{label:'Conversões',value:formatNumber(conversions)}],
+        analysis:`"${name}" tem ROAS de ${formatRoas(roas)} ${cpa>0?`com CPA de ${formatCurrency(cpa,currency)}`:''}. Aumentar o orçamento em 20-30% pode ampliar os resultados sem comprometer a eficiência.`,
+        metrics:[{label:'ROAS',value:formatRoas(roas)},{label:'Investido',value:formatCurrency(spend,currency)},{label:'Receita',value:revenue>0?formatCurrency(revenue,currency):'—'},{label:'Conversões',value:formatNumber(conversions)}],
         action:'increase_budget', actionValue:Math.round(spend*1.25*100), priority:1 })
     }
     if (roas > 0 && roas < 2 && spend > 100) {
       list.push({ id:`roas_low_${c.campaign_id}`, type:'warning',
         title:`ROAS abaixo de 2× — revise a campanha`, campaignName:name, campaignId:c.campaign_id,
         analysis:`"${name}" está com ROAS de ${formatRoas(roas)}. Revise públicos-alvo, criativos e oferta. Pause os conjuntos de menor desempenho.`,
-        metrics:[{label:'ROAS',value:formatRoas(roas)},{label:'Investido',value:formatCurrency(spend)},{label:'CPC',value:formatCurrency(cpc)}],
+        metrics:[{label:'ROAS',value:formatRoas(roas)},{label:'Investido',value:formatCurrency(spend,currency)},{label:'CPC',value:formatCurrency(cpc,currency)}],
         action:'open_manager', priority:2 })
     }
     if (ctr > 0 && ctr < 1 && impressions > 5000) {
       list.push({ id:`ctr_low_${c.campaign_id}`, type:'warning',
         title:`CTR de ${formatPercent(ctr)} — criativo pouco engajante`, campaignName:name, campaignId:c.campaign_id,
         analysis:`"${name}" tem CTR de ${formatPercent(ctr)} com ${formatNumber(impressions)} impressões. Um CTR abaixo de 1% indica que o criativo não está chamando atenção. Teste novos formatos, headlines ou ofertas.`,
-        metrics:[{label:'CTR',value:formatPercent(ctr)},{label:'Impressões',value:formatNumber(impressions)},{label:'CPM',value:formatCurrency(cpm)}],
+        metrics:[{label:'CTR',value:formatPercent(ctr)},{label:'Impressões',value:formatNumber(impressions)},{label:'CPM',value:formatCurrency(cpm,currency)}],
         action:'open_manager', priority:3 })
     }
     if (frequency > 3.5 && impressions > 1000) {
@@ -76,22 +76,22 @@ function generateInsights(campInsights) {
     if (whatsapp > 0) {
       list.push({ id:`wa_${c.campaign_id}`, type:'opportunity',
         title:`${formatNumber(whatsapp)} conversas WhatsApp geradas`, campaignName:name, campaignId:c.campaign_id,
-        analysis:`"${name}" está gerando ${formatNumber(whatsapp)} conversas no WhatsApp. ${cpc > 3 ? `Com CPC de ${formatCurrency(cpc)}, teste públicos Lookalike de quem já iniciou conversa para reduzir o custo.` : 'Escale o investimento nesta campanha para multiplicar os resultados.'}`,
-        metrics:[{label:'Conversas WhatsApp',value:formatNumber(whatsapp)},{label:'CPC',value:formatCurrency(cpc)},{label:'Investido',value:formatCurrency(spend)}],
+        analysis:`"${name}" está gerando ${formatNumber(whatsapp)} conversas no WhatsApp. ${cpc > 3 ? `Com CPC de ${formatCurrency(cpc,currency)}, teste públicos Lookalike de quem já iniciou conversa para reduzir o custo.` : 'Escale o investimento nesta campanha para multiplicar os resultados.'}`,
+        metrics:[{label:'Conversas WhatsApp',value:formatNumber(whatsapp)},{label:'CPC',value:formatCurrency(cpc,currency)},{label:'Investido',value:formatCurrency(spend,currency)}],
         action:'increase_budget', actionValue:Math.round(spend*1.20*100), priority:1 })
     }
     if (cpa > 50 && spend > 200) {
       list.push({ id:`cpa_${c.campaign_id}`, type:'critical',
-        title:`CPA de ${formatCurrency(cpa)} — acima do ideal`, campaignName:name, campaignId:c.campaign_id,
-        analysis:`O custo por resultado de "${name}" está em ${formatCurrency(cpa)} consumindo ${formatCurrency(spend)} para apenas ${formatNumber(conversions)} conversões. Pause os conjuntos de pior desempenho e realoque o orçamento.`,
-        metrics:[{label:'CPA',value:formatCurrency(cpa)},{label:'Investido',value:formatCurrency(spend)},{label:'Resultados',value:formatNumber(conversions)}],
+        title:`CPA de ${formatCurrency(cpa,currency)} — acima do ideal`, campaignName:name, campaignId:c.campaign_id,
+        analysis:`O custo por resultado de "${name}" está em ${formatCurrency(cpa,currency)} consumindo ${formatCurrency(spend,currency)} para apenas ${formatNumber(conversions)} conversões. Pause os conjuntos de pior desempenho e realoque o orçamento.`,
+        metrics:[{label:'CPA',value:formatCurrency(cpa,currency)},{label:'Investido',value:formatCurrency(spend,currency)},{label:'Resultados',value:formatNumber(conversions)}],
         action:'pause_campaign', priority:1 })
     }
     if (ctr > 3 && clicks > 500 && (purchases + leads) < clicks * 0.01) {
       list.push({ id:`ctr_noconv_${c.campaign_id}`, type:'warning',
         title:`Alto CTR (${formatPercent(ctr)}) mas poucas conversões`, campaignName:name, campaignId:c.campaign_id,
         analysis:`"${name}" tem ótimo CTR de ${formatPercent(ctr)} mas a taxa pós-clique está baixa. O problema provavelmente é na página de destino: velocidade, oferta ou call-to-action.`,
-        metrics:[{label:'CTR',value:formatPercent(ctr)},{label:'Cliques',value:formatNumber(clicks)},{label:'Conversões',value:formatNumber(purchases+leads)},{label:'CPC',value:formatCurrency(cpc)}],
+        metrics:[{label:'CTR',value:formatPercent(ctr)},{label:'Cliques',value:formatNumber(clicks)},{label:'Conversões',value:formatNumber(purchases+leads)},{label:'CPC',value:formatCurrency(cpc,currency)}],
         action:'open_manager', priority:2 })
     }
   })
@@ -110,7 +110,7 @@ const TYPE_CFG = {
 export default function Insights() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { isConnected, accountId, accountName, loadingConnection } = useMeta()
+  const { isConnected, accountId, accountName, loadingConnection, currency } = useMeta()
 
   const [insights,       setInsights]       = useState([])
   const [campaignData,   setCampaignData]   = useState([])
@@ -156,7 +156,7 @@ export default function Insights() {
           body: JSON.stringify({
             campaigns: data,
             dateLabel: DATE_PRESETS.find(p => p.id === datePreset)?.label || datePreset,
-            currency: 'BRL',
+            currency: currency || 'BRL',
           }),
         })
         if (resp.ok) {
@@ -188,7 +188,7 @@ export default function Insights() {
         }
       } catch {
         // Fallback: algoritmo local
-        generated = generateInsights(data)
+        generated = generateInsights(data, currency)
       }
 
       setInsights(generated)
@@ -414,7 +414,7 @@ export default function Insights() {
                         <td className="px-4 py-3 max-w-[220px]">
                           <p className="text-sm font-medium text-txt-primary truncate" title={c.campaign_name}>{c.campaign_name}</p>
                         </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{formatCurrency(spend)}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{formatCurrency(spend, currency)}</td>
                         <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{formatNumber(impressions)}</td>
                         <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{formatNumber(reach)}</td>
                         <td className="px-4 py-3 text-sm whitespace-nowrap">
@@ -422,8 +422,8 @@ export default function Insights() {
                             {ctr > 0 ? formatPercent(ctr) : '—'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{cpc > 0 ? formatCurrency(cpc) : '—'}</td>
-                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{cpm > 0 ? formatCurrency(cpm) : '—'}</td>
+                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{cpc > 0 ? formatCurrency(cpc, currency) : '—'}</td>
+                        <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">{cpm > 0 ? formatCurrency(cpm, currency) : '—'}</td>
                         <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
                           {convs > 0 ? (
                             <div>
@@ -440,7 +440,7 @@ export default function Insights() {
                         <td className="px-4 py-3 text-sm whitespace-nowrap">
                           {cpa > 0 ? (
                             <span className={`font-semibold ${cpa > 50 ? 'text-status-error' : cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
-                              {formatCurrency(cpa)}
+                              {formatCurrency(cpa, currency)}
                             </span>
                           ) : '—'}
                         </td>
@@ -479,7 +479,7 @@ export default function Insights() {
                   return (
                     <tr className="bg-surface-bg border-t-2 border-brand-200">
                       <td className="px-4 py-3 text-xs font-semibold text-txt-secondary uppercase tracking-wide">Total</td>
-                      <td className="px-4 py-3 text-sm font-bold text-txt-primary whitespace-nowrap">{formatCurrency(totSpend)}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-txt-primary whitespace-nowrap">{formatCurrency(totSpend, currency)}</td>
                       <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{formatNumber(totImp)}</td>
                       <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{formatNumber(totReach)}</td>
                       <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap">
@@ -487,13 +487,13 @@ export default function Insights() {
                           {totCtr > 0 ? formatPercent(totCtr) : '—'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{totCpc > 0 ? formatCurrency(totCpc) : '—'}</td>
-                      <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{totCpm > 0 ? formatCurrency(totCpm) : '—'}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{totCpc > 0 ? formatCurrency(totCpc, currency) : '—'}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-txt-primary whitespace-nowrap">{totCpm > 0 ? formatCurrency(totCpm, currency) : '—'}</td>
                       <td className="px-4 py-3 text-sm font-bold text-txt-primary whitespace-nowrap">{totConvs > 0 ? formatNumber(totConvs) : '—'}</td>
                       <td className="px-4 py-3 text-sm font-bold whitespace-nowrap">
                         {totCpa > 0 ? (
                           <span className={totCpa > 50 ? 'text-status-error' : totCpa > 20 ? 'text-status-warning' : 'text-status-success'}>
-                            {formatCurrency(totCpa)}
+                            {formatCurrency(totCpa, currency)}
                           </span>
                         ) : '—'}
                       </td>

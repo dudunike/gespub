@@ -83,7 +83,7 @@ function BudgetModal({ campaign, onSave, onClose }) {
 
 export default function Campaigns() {
   const navigate = useNavigate()
-  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId } = useMeta()
+  const { isConnected, loadingConnection, connections, activeAccounts, selectedAccountId, setSelectedAccountId, currency } = useMeta()
 
   const [campaigns, setCampaigns] = useState([])
   const [insights, setInsights] = useState({})   // campaignId → insight obj
@@ -336,13 +336,13 @@ export default function Campaigns() {
                           className="flex items-center gap-1 hover:text-brand-500 transition-colors group"
                           title="Clique para editar"
                         >
-                          {formatCurrency(c.budget)}
+                          {formatCurrency(c.budget, currency)}
                           <IconEdit size={12} className="opacity-0 group-hover:opacity-100" />
                         </button>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-txt-primary whitespace-nowrap">
-                      {c.spend > 0 ? formatCurrency(c.spend) : '—'}
+                      {c.spend > 0 ? formatCurrency(c.spend, currency) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
                       {c.impressions > 0 ? formatNumber(c.impressions) : '—'}
@@ -354,7 +354,7 @@ export default function Campaigns() {
                       {c.ctr > 0 ? formatPercent(c.ctr) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-txt-primary whitespace-nowrap">
-                      {c.cpc > 0 ? formatCurrency(c.cpc) : '—'}
+                      {c.cpc > 0 ? formatCurrency(c.cpc, currency) : '—'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {c.totalConversions > 0 ? (
@@ -371,7 +371,7 @@ export default function Campaigns() {
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {c.cpa > 0 ? (
                         <span className={`font-semibold ${c.cpa > 50 ? 'text-status-error' : c.cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
-                          {formatCurrency(c.cpa)}
+                          {formatCurrency(c.cpa, currency)}
                         </span>
                       ) : '—'}
                     </td>
@@ -434,13 +434,13 @@ export default function Campaigns() {
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">Totais ({prepared.length})</td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>
-                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tSpend, currency)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tImp)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tClicks)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatPercent(tCtr)}</td>
-                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpc)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpc, currency)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
-                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpa)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpa, currency)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatRoas(tRoas)}</td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>

@@ -1,10 +1,25 @@
 // Funções de formatação para o padrão brasileiro
 
-// Formatar valor monetário em BRL (R$)
-export const formatCurrency = (value) => {
-  return new Intl.NumberFormat('pt-BR', {
+const CURRENCY_LOCALE = {
+  BRL: 'pt-BR',
+  USD: 'en-US',
+  EUR: 'de-DE',
+  GBP: 'en-GB',
+  ARS: 'es-AR',
+  MXN: 'es-MX',
+  COP: 'es-CO',
+  CLP: 'es-CL',
+  PEN: 'es-PE',
+  UYU: 'es-UY',
+}
+
+// Formatar valor monetário conforme a moeda da conta de anúncios
+export const formatCurrency = (value, currency = 'BRL') => {
+  const cur    = currency || 'BRL'
+  const locale = CURRENCY_LOCALE[cur] || 'en-US'
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'BRL',
+    currency: cur,
   }).format(value)
 }
 
