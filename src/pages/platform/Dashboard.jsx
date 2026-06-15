@@ -105,6 +105,10 @@ export default function Dashboard() {
   const [followersLoading, setFollowersLoading] = useState(false)
   const [igStats, setIgStats] = useState(null)
   const [showReportChoice, setShowReportChoice] = useState(false)
+  const [reportType, setReportType]             = useState(null)
+  const [compareWith, setCompareWith]           = useState('none')
+  const [comparisonInsights, setComparisonInsights] = useState([])
+  const [reportLoading, setReportLoading]       = useState(false)
 
   // Busca insights reais do Meta Ads
   const loadInsights = async () => {
@@ -206,7 +210,53 @@ export default function Dashboard() {
   // Relatório visual (pro/advanced/enterprise)
   const canDownloadReport = ['pro', 'advanced', 'enterprise'].includes(user?.plan)
 
-  const openClientReport = () => {
+  const calcCompareRange = (since, until, mode) => {
+    const s   = new Date(since + 'T00:00:00')
+    const u   = new Date(until + 'T00:00:00')
+    const iso = d => d.toISOString().slice(0, 10)
+    const diff = Math.round((u - s) / 86400000)
+    if (mode === 'prev') {
+      const pu = new Date(s); pu.setDate(s.getDate() - 1)
+      const ps = new Date(pu); ps.setDate(pu.getDate() - diff)
+      return { since: iso(ps), until: iso(pu) }
+    }
+    if (mode === 'last_month') {
+      const end   = new Date(s.getFullYear(), s.getMonth(), 0)
+      const start = new Date(end.getFullYear(), end.getMonth(), 1)
+      return { since: iso(start), until: iso(end) }
+    }
+    if (mode === 'last_year') {
+      return { since: since.replace(/^\d{4}/, y => String(+y - 1)), until: until.replace(/^\d{4}/, y => String(+y - 1)) }
+    }
+    return null
+  }
+
+  const handleGerarRelatorio = async (type) => {
+    setReportLoading(true)
+    let compData = []
+    let compRange = null
+    if (compareWith !== 'none') {
+      const { since, until } = getActualDateRange(datePreset, timeRange)
+      compRange = calcCompareRange(since, until, compareWith)
+      if (compRange) {
+        try {
+          const allComp = await Promise.all(activeAccounts.map(async acc => {
+            const data = await getCampaignInsights(acc.account_id, 'custom', compRange)
+            return data.map(i => ({ ...i, _account_id: acc.account_id, _account_name: acc.account_name || acc.account_id }))
+          }))
+          compData = allComp.flat()
+        } catch (_) {}
+      }
+    }
+    setComparisonInsights(compData)
+    setShowReportChoice(false)
+    setReportType(null)
+    setReportLoading(false)
+    if (type === 'client') openClientReport(compData, compRange)
+    else openReport(compData, compRange)
+  }
+
+  const openClientReport = (compareData = [], compareRange = null) => {
     const fC  = (v) => formatCurrency(Number(v || 0), currency)
     const fN  = (v) => Number(v || 0).toLocaleString('pt-BR')
 
@@ -229,6 +279,8 @@ export default function Dashboard() {
     const calcTotals = (arr) => {
       const sp  = arr.reduce((s, i) => s + Number(i.spend || 0), 0)
       const re  = arr.reduce((s, i) => s + Number(i.reach || 0), 0)
+      const cl  = arr.reduce((s, i) => s + Number(i.clicks || 0), 0)
+      const im  = arr.reduce((s, i) => s + Number(i.impressions || 0), 0)
       const rv  = arr.reduce((s, i) => s + getActionValue(i.action_values, 'purchase'), 0)
       const pu  = arr.reduce((s, i) => s + getActionCount(i.actions, 'purchase'), 0)
       const wa  = arr.reduce((s, i) => s + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d'), 0)
@@ -236,10 +288,73 @@ export default function Dashboard() {
       const cv  = pu + wa + ld
       const r   = sp > 0 && rv > 0 ? rv / sp : 0
       const cpa = sp > 0 && cv > 0  ? sp / cv : 0
+      const ctr = im > 0 ? (cl / im) * 100 : 0
+      const cpc = cl > 0 ? sp / cl : 0
       const re2 = arr.reduce((s, i) => s + getActionCount(i.actions, 'post_reaction'), 0)
       const cm  = arr.reduce((s, i) => s + getActionCount(i.actions, 'comment'), 0)
-      return { sp, re, rv, pu, wa, ld, cv, r, cpa, re2, cm }
+      return { sp, re, cl, im, rv, pu, wa, ld, cv, r, cpa, ctr, cpc, re2, cm }
     }
+
+    const prevT = compareData.length > 0 ? calcTotals(compareData) : null
+    const currT = calcTotals(insights)
+
+    const delta = (curr, prev) => {
+      if (!prev || prev === 0 || !prevT) return ''
+      const pct = ((curr - prev) / prev) * 100
+      const up  = pct >= 0
+      const good = up
+      return `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-top:4px;background:${good?'#dcfce7':'#fee2e2'};color:${good?'#16a34a':'#dc2626'}">${up?'↑':'↓'} ${Math.abs(pct).toFixed(0)}% vs anterior</span>`
+    }
+    const deltaInv = (curr, prev) => {
+      if (!prev || prev === 0 || !prevT) return ''
+      const pct = ((curr - prev) / prev) * 100
+      const up  = pct >= 0
+      return `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-top:4px;background:${up?'#fee2e2':'#dcfce7'};color:${up?'#dc2626':'#16a34a'}">${up?'↑':'↓'} ${Math.abs(pct).toFixed(0)}% vs anterior</span>`
+    }
+
+    const comparePeriodLabel = compareRange
+      ? `${compareRange.since.slice(5).replace('-','/')} a ${compareRange.until.slice(5).replace('-','/')}`
+      : ''
+
+    const cmpBarSection = prevT ? (() => {
+      const items = [
+        { label: '💰 Investimento', curr: currT.sp, prev: prevT.sp, fmt: fC, inv: true },
+        { label: '👥 Alcance',      curr: currT.re, prev: prevT.re, fmt: fN },
+        { label: '👆 Cliques',      curr: currT.cl, prev: prevT.cl, fmt: fN },
+        { label: '🎯 Conversões',   curr: currT.cv, prev: prevT.cv, fmt: fN },
+      ].filter(x => x.curr > 0 || x.prev > 0)
+      const rows = items.map(({ label, curr, prev, fmt, inv }) => {
+        const maxVal = Math.max(curr, prev, 1)
+        const pCurr  = Math.round((curr / maxVal) * 100)
+        const pPrev  = Math.round((prev / maxVal) * 100)
+        const pct    = prev > 0 ? ((curr - prev) / prev) * 100 : 0
+        const up     = pct >= 0
+        const good   = inv ? !up : up
+        return `
+<div style="margin-bottom:18px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <span style="font-size:12px;font-weight:700;color:#18181b">${label}</span>
+    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${good?'#dcfce7':'#fee2e2'};color:${good?'#16a34a':'#dc2626'}">${up?'↑':'↓'} ${Math.abs(pct).toFixed(0)}%</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <span style="font-size:10px;color:#7c3aed;font-weight:600;width:44px;flex-shrink:0">Atual</span>
+    <div style="flex:1;height:12px;background:#f4f4f5;border-radius:4px;overflow:hidden"><div style="height:100%;width:${pCurr}%;background:linear-gradient(90deg,#c4b5fd,#7c3aed);border-radius:4px"></div></div>
+    <span style="font-size:11px;font-weight:700;color:#18181b;width:72px;text-align:right;flex-shrink:0">${fmt(curr)}</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:10px;color:#a1a1aa;font-weight:500;width:44px;flex-shrink:0">Ant.</span>
+    <div style="flex:1;height:12px;background:#f4f4f5;border-radius:4px;overflow:hidden"><div style="height:100%;width:${pPrev}%;background:#d4d4d8;border-radius:4px"></div></div>
+    <span style="font-size:11px;font-weight:600;color:#71717a;width:72px;text-align:right;flex-shrink:0">${fmt(prev)}</span>
+  </div>
+</div>`
+      })
+      return `
+<div class="card">
+  <div class="card-title">📊 Comparação com período anterior</div>
+  <div style="font-size:11px;color:#71717a;margin-bottom:14px">Período anterior: ${comparePeriodLabel}</div>
+  ${rows.join('')}
+</div>`
+    })() : ''
 
     const perfScore = roas >= 4 ? { label: 'Excelente',      color: '#16a34a', bg: '#dcfce7', emoji: '🏆', desc: 'Resultados acima da média' }
       : roas >= 3 ? { label: 'Ótimo',         color: '#16a34a', bg: '#dcfce7', emoji: '🚀', desc: 'Campanha com bom retorno' }
@@ -471,6 +586,7 @@ function compartilhar(){
     <div class="kpi-val" style="color:#16a34a">${fC(totalRevenue)}</div>
     <div class="kpi-lbl">Receita gerada</div>
     <div class="kpi-sub">retorno atribuído</div>
+    ${delta(totalRevenue, prevT?.rv)}
   </div>` : ''}
   ${totalConversions > 0 ? `
   <div class="kpi">
@@ -478,8 +594,27 @@ function compartilhar(){
     <div class="kpi-val" style="color:#7c3aed">${fN(totalConversions)}</div>
     <div class="kpi-lbl">Resultado${totalConversions !== 1 ? 's' : ''} gerado${totalConversions !== 1 ? 's' : ''}</div>
     <div class="kpi-sub">${cpa > 0 ? `custo por resultado: ${fC(cpa)}` : 'conversões no período'}</div>
+    ${delta(totalConversions, prevT?.cv)}
+  </div>` : ''}
+  ${totalClicks > 0 ? `
+  <div class="kpi">
+    <span class="kpi-icon">👆</span>
+    <div class="kpi-val">${fN(totalClicks)}</div>
+    <div class="kpi-lbl">Cliques no anúncio</div>
+    <div class="kpi-sub">${avgCtr > 0 ? 'CTR: ' + avgCtr.toFixed(2) + '%' : 'taxa de clique'}</div>
+    ${delta(totalClicks, prevT?.cl)}
+  </div>` : ''}
+  ${avgCpc > 0 ? `
+  <div class="kpi">
+    <span class="kpi-icon">💲</span>
+    <div class="kpi-val">${fC(avgCpc)}</div>
+    <div class="kpi-lbl">Custo por clique</div>
+    <div class="kpi-sub">CPC médio</div>
+    ${deltaInv(avgCpc, prevT && prevT.cl > 0 ? prevT.sp / prevT.cl : 0)}
   </div>` : ''}
 </div>
+
+${cmpBarSection}
 
 ${roas > 0 ? `
 <div class="card">
@@ -583,12 +718,89 @@ ${hasMultiAccounts ? `
     }
   }
 
-  const openReport = () => {
+  const openReport = (compareData = [], compareRange = null) => {
     if (!canDownloadReport || insights.length === 0) return
 
     const fC  = (v) => formatCurrency(Number(v || 0), currency)
     const fN  = (v) => Number(v || 0).toLocaleString('pt-BR')
     const fP  = (v) => `${Number(v || 0).toFixed(2)}%`
+
+    const calcT = (arr) => {
+      const sp = arr.reduce((s, i) => s + Number(i.spend || 0), 0)
+      const re = arr.reduce((s, i) => s + Number(i.reach || 0), 0)
+      const cl = arr.reduce((s, i) => s + Number(i.clicks || 0), 0)
+      const im = arr.reduce((s, i) => s + Number(i.impressions || 0), 0)
+      const rv = arr.reduce((s, i) => s + getActionValue(i.action_values, 'purchase'), 0)
+      const pu = arr.reduce((s, i) => s + getActionCount(i.actions, 'purchase'), 0)
+      const wa = arr.reduce((s, i) => s + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d'), 0)
+      const ld = arr.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
+      const cv = pu + wa + ld
+      const r  = sp > 0 && rv > 0 ? rv / sp : 0
+      const cpa = sp > 0 && cv > 0 ? sp / cv : 0
+      const ctr = im > 0 ? (cl / im) * 100 : 0
+      const cpc = cl > 0 ? sp / cl : 0
+      return { sp, re, cl, im, rv, pu, wa, ld, cv, r, cpa, ctr, cpc }
+    }
+    const prevT = compareData.length > 0 ? calcT(compareData) : null
+
+    const deltaR = (curr, prev, inv = false) => {
+      if (!prev || prev === 0 || !prevT) return ''
+      const pct  = ((curr - prev) / prev) * 100
+      const up   = pct >= 0
+      const good = inv ? !up : up
+      return `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:${good?'#dcfce7':'#fee2e2'};color:${good?'#16a34a':'#dc2626'}">${up?'↑':'↓'} ${Math.abs(pct).toFixed(0)}%</span>`
+    }
+
+    const comparePeriodLabelR = compareRange
+      ? `${compareRange.since.slice(5).replace('-','/')} a ${compareRange.until.slice(5).replace('-','/')}`
+      : ''
+
+    const cmpSection = prevT ? (() => {
+      const items = [
+        { label: '💰 Investimento', curr: totalSpend, prev: prevT.sp, fmt: fC, inv: true },
+        { label: '📈 Receita',      curr: totalRevenue, prev: prevT.rv, fmt: fC },
+        { label: '👥 Alcance',      curr: totalReach, prev: prevT.re, fmt: fN },
+        { label: '👆 Cliques',      curr: totalClicks, prev: prevT.cl, fmt: fN },
+        { label: '🎯 Conversões',   curr: totalConversions, prev: prevT.cv, fmt: fN },
+        { label: '⚡ ROAS',         curr: roas, prev: prevT.r, fmt: v => v.toFixed(2) + '×' },
+      ].filter(x => x.curr > 0 || x.prev > 0)
+      const rows = items.map(({ label, curr, prev, fmt, inv }) => {
+        const maxV  = Math.max(curr, prev, 1)
+        const pC    = Math.round((curr / maxV) * 100)
+        const pP    = Math.round((prev / maxV) * 100)
+        const pct   = prev > 0 ? ((curr - prev) / prev) * 100 : 0
+        const up    = pct >= 0
+        const good  = inv ? !up : up
+        return `
+<div style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+    <span style="font-size:12px;font-weight:700;color:#18181b">${label}</span>
+    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${good?'#dcfce7':'#fee2e2'};color:${good?'#16a34a':'#dc2626'}">${up?'↑':'↓'} ${Math.abs(pct).toFixed(0)}%</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+    <span style="font-size:10px;color:#7c3aed;font-weight:600;width:44px;flex-shrink:0">Atual</span>
+    <div style="flex:1;height:10px;background:#f4f4f5;border-radius:3px;overflow:hidden"><div style="height:100%;width:${pC}%;background:linear-gradient(90deg,#c4b5fd,#7c3aed);border-radius:3px"></div></div>
+    <span style="font-size:11px;font-weight:700;color:#18181b;width:80px;text-align:right;flex-shrink:0">${fmt(curr)}</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:10px;color:#a1a1aa;font-weight:500;width:44px;flex-shrink:0">Ant.</span>
+    <div style="flex:1;height:10px;background:#f4f4f5;border-radius:3px;overflow:hidden"><div style="height:100%;width:${pP}%;background:#d4d4d8;border-radius:3px"></div></div>
+    <span style="font-size:11px;font-weight:600;color:#71717a;width:80px;text-align:right;flex-shrink:0">${fmt(prev)}</span>
+  </div>
+</div>`
+      })
+      return `
+<div class="sec">
+  <div class="sec-hd">
+    <div class="sec-title">📊 Comparação de Períodos</div>
+    <div class="sec-sub">Período anterior: ${comparePeriodLabelR}</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>${rows.slice(0, Math.ceil(rows.length/2)).join('')}</div>
+    <div>${rows.slice(Math.ceil(rows.length/2)).join('')}</div>
+  </div>
+</div>`
+    })() : ''
 
     const periodLabel  = DATE_PRESETS.find(d => d.id === datePreset)?.label || datePreset
     const accountName  = connections[0]?.account_name || ''
@@ -797,23 +1009,29 @@ function compartilhar(){
     <div class="kpi-lbl">💰 Valor Investido</div>
     <div class="kpi-val">${fC(totalSpend)}</div>
     <div class="kpi-sub">${sortedC.length} campanha${sortedC.length !== 1 ? 's' : ''} no período</div>
+    ${deltaR(totalSpend, prevT?.sp, true)}
   </div>
   <div class="kpi">
     <div class="kpi-lbl">📈 Receita Gerada</div>
     <div class="kpi-val ${totalRevenue > 0 ? 'g' : ''}">${totalRevenue > 0 ? fC(totalRevenue) : '—'}</div>
     <div class="kpi-sub">${totalRevenue > 0 ? 'Valor atribuído às compras' : 'Sem rastreamento de compras'}</div>
+    ${deltaR(totalRevenue, prevT?.rv)}
   </div>
   <div class="kpi">
     <div class="kpi-lbl">⚡ ROAS</div>
     <div class="kpi-val ${roas >= 3 ? 'g' : roas > 0 ? 'p' : ''}">${roas > 0 ? roas.toFixed(2) + '×' : '—'}</div>
     <div class="kpi-sub">${roas >= 4 ? '<span class="badge b-g">Excelente ✓</span>' : roas >= 3 ? '<span class="badge b-g">Bom ✓</span>' : roas >= 2 ? '<span class="badge b-a">Moderado</span>' : roas > 0 ? '<span class="badge b-r">Abaixo do ideal</span>' : 'Sem receita rastreada'}</div>
+    ${deltaR(roas, prevT?.r)}
   </div>
   <div class="kpi">
     <div class="kpi-lbl">🎯 Conversões</div>
     <div class="kpi-val p">${totalConversions > 0 ? fN(totalConversions) : '—'}</div>
     <div class="kpi-sub">${cpa > 0 ? 'CPA: ' + fC(cpa) : 'Nenhuma conversão rastreada'}</div>
+    ${deltaR(totalConversions, prevT?.cv)}
   </div>
 </div>
+
+${cmpSection}
 
 <div class="sec">
   <div class="sec-hd"><div class="sec-title">Métricas de Alcance & Eficiência</div></div>
@@ -1449,43 +1667,86 @@ function compartilhar(){
           <div className="bg-white rounded-card border border-border shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <div>
-                <p className="text-sm font-semibold text-txt-primary">Para quem é este relatório?</p>
-                <p className="text-xs text-txt-secondary mt-0.5">Escolha o formato ideal</p>
+                {!reportType ? (
+                  <>
+                    <p className="text-sm font-semibold text-txt-primary">Para quem é este relatório?</p>
+                    <p className="text-xs text-txt-secondary mt-0.5">Escolha o formato ideal</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-txt-primary">Comparar com outro período?</p>
+                    <p className="text-xs text-txt-secondary mt-0.5">Opcional — mostra variação % no relatório</p>
+                  </>
+                )}
               </div>
-              <button onClick={() => setShowReportChoice(false)} className="p-1.5 rounded-input text-txt-secondary hover:bg-surface-bg transition-colors">
+              <button onClick={() => { setShowReportChoice(false); setReportType(null); setCompareWith('none') }} className="p-1.5 rounded-input text-txt-secondary hover:bg-surface-bg transition-colors">
                 <IconX size={16} />
               </button>
             </div>
-            <div className="p-5 grid grid-cols-2 gap-3">
-              <button
-                onClick={() => { setShowReportChoice(false); openClientReport() }}
-                className="group flex flex-col items-center gap-3 p-5 border-2 border-border rounded-card hover:border-brand-400 hover:bg-brand-50/40 transition-all text-center"
-              >
-                <div className="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center group-hover:bg-brand-100 transition-colors">
-                  <IconUsers size={22} className="text-brand-500" strokeWidth={1.5} />
+
+            {!reportType ? (
+              <div className="p-5 grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setReportType('client')}
+                  className="group flex flex-col items-center gap-3 p-5 border-2 border-border rounded-card hover:border-brand-400 hover:bg-brand-50/40 transition-all text-center"
+                >
+                  <div className="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center group-hover:bg-brand-100 transition-colors">
+                    <IconUsers size={22} className="text-brand-500" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-txt-primary">Para o cliente</p>
+                    <p className="text-xs text-txt-secondary mt-1 leading-relaxed">Simples e visual — foco nos resultados. Sem termos técnicos.</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setReportType('technical')}
+                  className="group flex flex-col items-center gap-3 p-5 border-2 border-border rounded-card hover:border-brand-400 hover:bg-brand-50/40 transition-all text-center"
+                >
+                  <div className="w-12 h-12 bg-surface-bg rounded-full flex items-center justify-center group-hover:bg-brand-100 transition-colors">
+                    <IconChartBar size={22} className="text-txt-secondary group-hover:text-brand-500 transition-colors" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-txt-primary">Análise técnica</p>
+                    <p className="text-xs text-txt-secondary mt-1 leading-relaxed">Métricas completas: CTR, CPM, CPC, campanhas detalhadas.</p>
+                  </div>
+                </button>
+              </div>
+            ) : (
+              <div className="p-5 space-y-3">
+                {[
+                  { value: 'none',       label: 'Sem comparação',                   sub: 'Relatório simples do período atual' },
+                  { value: 'prev',       label: 'Período anterior equivalente',      sub: 'Mesma duração, imediatamente antes' },
+                  { value: 'last_month', label: 'Mês passado',                       sub: 'Compara com o mês anterior completo' },
+                  { value: 'last_year',  label: 'Mesmo período do ano passado',      sub: 'Comparação ano a ano (YoY)' },
+                ].map(({ value, label, sub }) => (
+                  <button
+                    key={value}
+                    onClick={() => setCompareWith(value)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 border-2 rounded-card text-left transition-all ${compareWith === value ? 'border-brand-500 bg-brand-50/50' : 'border-border hover:border-brand-300 hover:bg-surface-bg'}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${compareWith === value ? 'border-brand-500 bg-brand-500' : 'border-border'}`}>
+                      {compareWith === value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-txt-primary">{label}</p>
+                      <p className="text-xs text-txt-secondary">{sub}</p>
+                    </div>
+                  </button>
+                ))}
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setReportType(null)} className="flex-1 py-2.5 border border-border rounded-input text-sm text-txt-secondary hover:bg-surface-bg transition-colors">
+                    ← Voltar
+                  </button>
+                  <button
+                    onClick={() => handleGerarRelatorio(reportType)}
+                    disabled={reportLoading}
+                    className="flex-1 py-2.5 bg-brand-500 text-white rounded-input text-sm font-semibold hover:bg-brand-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {reportLoading ? '⏳ Buscando dados...' : '📥 Gerar Relatório'}
+                  </button>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-txt-primary">Para o cliente</p>
-                  <p className="text-xs text-txt-secondary mt-1 leading-relaxed">
-                    Simples e visual — foco nos resultados. Sem termos técnicos.
-                  </p>
-                </div>
-              </button>
-              <button
-                onClick={() => { setShowReportChoice(false); openReport() }}
-                className="group flex flex-col items-center gap-3 p-5 border-2 border-border rounded-card hover:border-brand-400 hover:bg-brand-50/40 transition-all text-center"
-              >
-                <div className="w-12 h-12 bg-surface-bg rounded-full flex items-center justify-center group-hover:bg-brand-100 transition-colors">
-                  <IconChartBar size={22} className="text-txt-secondary group-hover:text-brand-500 transition-colors" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-txt-primary">Análise técnica</p>
-                  <p className="text-xs text-txt-secondary mt-1 leading-relaxed">
-                    Métricas completas: CTR, CPM, CPC, campanhas detalhadas.
-                  </p>
-                </div>
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
