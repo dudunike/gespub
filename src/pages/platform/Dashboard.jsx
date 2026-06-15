@@ -390,24 +390,41 @@ body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#f5f3f
   .eng-row{grid-template-columns:1fr}
   .soc-row{grid-template-columns:1fr}
 }
-@media print{
-  body{background:#fff}
-  .no-print{display:none!important}
-  .wrap{padding:8px;max-width:100%}
-  .card,.kpi,.conv,.eng,.soc{break-inside:avoid}
-  .header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}
+@media print{body{background:#fff}.no-print{display:none!important}.wrap{padding:8px;max-width:100%}.card,.kpi,.conv,.eng,.soc{break-inside:avoid}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+function gerarPDF(){
+  var btn=document.getElementById('btn-dl');
+  var np=document.querySelector('.no-print');
+  btn.innerHTML='⏳ Gerando PDF...';btn.disabled=true;
+  np.style.display='none';
+  html2pdf().set({
+    margin:[6,4,6,4],
+    filename:'resultados-${periodShort.replace(/\//g,'-')}.pdf',
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2,useCORS:true,logging:false},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).from(document.querySelector('.wrap')).save().then(function(){
+    np.style.display='flex';
+    btn.innerHTML='✅ PDF baixado!';btn.disabled=false;
+    setTimeout(function(){btn.innerHTML='📥 Baixar PDF';},3000);
+  }).catch(function(){
+    np.style.display='flex';btn.innerHTML='📥 Baixar PDF';btn.disabled=false;
+    window.print();
+  });
+}
+function compartilhar(){
+  if(navigator.share){navigator.share({title:'Resultados ${periodShort}',text:'Confira os resultados dos seus anúncios!'}).catch(function(){});}
+  else{try{navigator.clipboard.writeText(location.href);alert('Link copiado!');}catch(e){}}
+}
+</script>
 </head>
 <body>
 <div class="wrap">
 <div class="no-print">
-  <button class="btn-pdf" onclick="window.print()">🖨️ &nbsp;Salvar como PDF / Imprimir</button>
-  <button class="btn-close" onclick="
-    if(navigator.share){navigator.share({title:'Resultados ${periodShort}',text:'Relatório de resultados dos anúncios'}).catch(()=>{})}
-    else{try{navigator.clipboard.writeText(location.href);alert('Link copiado!')}catch(e){window.close()}}
-  ">↗ Compartilhar</button>
-  <div class="mob-tip">💡 Para salvar como PDF: toque nos 3 pontos do navegador → Imprimir → Salvar como PDF</div>
+  <button class="btn-pdf" id="btn-dl" onclick="gerarPDF()">📥 Baixar PDF</button>
+  <button class="btn-close" onclick="compartilhar()">↗ Compartilhar</button>
 </div>
 
 <!-- HEADER -->
@@ -725,18 +742,42 @@ tr:last-child td{border-bottom:none}
   .metrics-grid{grid-template-columns:1fr}
   .eng-grid{grid-template-columns:1fr}
 }
+@media print{body{background:#fff}.no-print{display:none!important}.wrap{max-width:100%;padding:10px}.header,.sec,.kpi{break-inside:avoid}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+function gerarPDF(){
+  var btn=document.getElementById('btn-dl');
+  var np=document.querySelector('.no-print');
+  btn.innerHTML='⏳ Gerando PDF...';btn.disabled=true;
+  np.style.display='none';
+  html2pdf().set({
+    margin:[5,4,5,4],
+    filename:'relatorio-${periodLabel.replace(/\s/g,'-')}.pdf',
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2,useCORS:true,logging:false},
+    jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}
+  }).from(document.querySelector('.wrap')).save().then(function(){
+    np.style.display='flex';
+    btn.innerHTML='✅ PDF baixado!';btn.disabled=false;
+    setTimeout(function(){btn.innerHTML='📥 Baixar PDF';},3000);
+  }).catch(function(){
+    np.style.display='flex';btn.innerHTML='📥 Baixar PDF';btn.disabled=false;
+    window.print();
+  });
+}
+function compartilhar(){
+  if(navigator.share){navigator.share({title:'Relatório de Performance — ${periodLabel}',text:'Análise técnica dos anúncios Meta Ads'}).catch(function(){});}
+  else{try{navigator.clipboard.writeText(location.href);alert('Link copiado!');}catch(e){}}
+}
+</script>
 </head>
 <body>
 <div class="wrap">
 
 <div class="no-print">
-  <button class="btn-pdf" onclick="window.print()">🖨️ &nbsp;Salvar como PDF / Imprimir</button>
-  <button class="btn-close" onclick="
-    if(navigator.share){navigator.share({title:'Relatório de Performance — ${periodLabel}',text:'Análise técnica dos anúncios Meta Ads'}).catch(()=>{})}
-    else{try{navigator.clipboard.writeText(location.href);alert('Link copiado!')}catch(e){window.close()}}
-  ">↗ Compartilhar</button>
-  <div class="mob-tip">💡 Para salvar como PDF: toque nos 3 pontos do navegador → Imprimir → Salvar como PDF</div>
+  <button class="btn-pdf" id="btn-dl" onclick="gerarPDF()">📥 Baixar PDF</button>
+  <button class="btn-close" onclick="compartilhar()">↗ Compartilhar</button>
 </div>
 
 <div class="header">
