@@ -248,18 +248,33 @@ export default function Dashboard() {
       : roas > 0  ? { label: 'Atenção',       color: '#dc2626', bg: '#fee2e2', emoji: '⚠️', desc: 'Estratégia precisa de ajustes' }
       : { label: 'Em andamento', color: '#7c3aed', bg: '#f5f3ff', emoji: '📋', desc: 'Acompanhamento em progresso' }
 
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+
+    const downloadHTML = (html, name) => {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Resultados ${periodShort}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#f5f3ff;-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#18181b}
 .wrap{max-width:700px;margin:0 auto;padding:24px 18px}
 .no-print{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
-.btn-pdf{display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
-.btn-close{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#52525b;border:1px solid #e4e4e7;padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer}
+.btn-pdf{display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn-close{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#52525b;border:1px solid #e4e4e7;padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mob-tip{font-size:11px;color:#71717a;margin-top:6px;line-height:1.5;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #e4e4e7;display:none}
 
 /* ── Header ── */
 .header{background:linear-gradient(135deg,#7c3aed 0%,#4c1d95 100%);color:#fff;border-radius:20px;padding:36px 32px 28px;margin-bottom:16px;position:relative;overflow:hidden}
@@ -348,15 +363,51 @@ body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#f5f3f
 .footer-brand{font-size:14px;font-weight:800;color:#7c3aed}
 .footer-date{font-size:11px;color:#a1a1aa;margin-top:3px}
 
-@media print{body{background:#fff}.no-print{display:none!important}.wrap{padding:8px;max-width:100%}.card,.kpi,.conv,.eng,.soc{break-inside:avoid}}
-@media(max-width:480px){.kpi-grid{grid-template-columns:1fr}.conv-row{grid-template-columns:1fr 1fr}.acc-kpis{grid-template-columns:1fr 1fr}}
+/* ── Mobile ── */
+@media(max-width:600px){
+  .wrap{padding:16px 12px}
+  .no-print{flex-direction:column;gap:8px}
+  .btn-pdf,.btn-close{width:100%;justify-content:center;padding:13px 16px;font-size:14px;border-radius:10px}
+  .mob-tip{display:block}
+  .header{padding:24px 20px 20px;border-radius:14px}
+  .h-client{font-size:18px}
+  .h-sub{font-size:12px}
+  .h-period{font-size:12px;padding:5px 12px}
+  .score{flex-direction:column;text-align:center;gap:10px;padding:16px}
+  .score-icon{font-size:40px}
+  .score-title{font-size:24px}
+  .roas-row{flex-direction:column;text-align:center;gap:10px;padding:16px}
+  .roas-num{font-size:34px}
+  .conv-row{grid-template-columns:1fr 1fr}
+  .acc-kpis{grid-template-columns:1fr 1fr}
+  .kpi{padding:16px 12px}
+  .kpi-val{font-size:24px}
+  .card{padding:16px}
+}
+@media(max-width:380px){
+  .kpi-grid{grid-template-columns:1fr}
+  .conv-row{grid-template-columns:1fr}
+  .eng-row{grid-template-columns:1fr}
+  .soc-row{grid-template-columns:1fr}
+}
+@media print{
+  body{background:#fff}
+  .no-print{display:none!important}
+  .wrap{padding:8px;max-width:100%}
+  .card,.kpi,.conv,.eng,.soc{break-inside:avoid}
+  .header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 </style>
 </head>
 <body>
 <div class="wrap">
 <div class="no-print">
   <button class="btn-pdf" onclick="window.print()">🖨️ &nbsp;Salvar como PDF / Imprimir</button>
-  <button class="btn-close" onclick="window.close()">✕ Fechar</button>
+  <button class="btn-close" onclick="
+    if(navigator.share){navigator.share({title:'Resultados ${periodShort}',text:'Relatório de resultados dos anúncios'}).catch(()=>{})}
+    else{try{navigator.clipboard.writeText(location.href);alert('Link copiado!')}catch(e){window.close()}}
+  ">↗ Compartilhar</button>
+  <div class="mob-tip">💡 Para salvar como PDF: toque nos 3 pontos do navegador → Imprimir → Salvar como PDF</div>
 </div>
 
 <!-- HEADER -->
@@ -496,17 +547,22 @@ ${hasMultiAccounts ? `
 </body>
 </html>`
 
+    if (isMobile) {
+      downloadHTML(html, `resultados-${periodShort.replace(/\//g,'-')}.html`)
+      return
+    }
+
     try {
       const win = window.open('', '_blank')
       if (!win) {
-        alert('Seu navegador bloqueou o popup. Permita popups para este site e tente novamente.')
+        downloadHTML(html, `resultados-${periodShort.replace(/\//g,'-')}.html`)
         return
       }
       win.document.write(html)
       win.document.close()
     } catch (err) {
       console.error('[openClientReport] Erro ao gerar relatório:', err)
-      alert('Erro ao gerar relatório: ' + (err?.message || 'erro desconhecido'))
+      downloadHTML(html, `resultados-${periodShort.replace(/\//g,'-')}.html`)
     }
   }
 
@@ -536,18 +592,33 @@ ${hasMultiAccounts ? `
     const purchDeg = totalConversions > 0 ? (totalPurchases / totalConversions) * 360 : 120
     const wappDeg  = totalConversions > 0 ? (totalWhatsapp  / totalConversions) * 360 : 120
 
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+
+    const downloadHTML = (content, name) => {
+      const blob = new Blob([content], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Relatório GesPub.ai — ${periodLabel}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;color:#18181b;background:#f4f4f5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .wrap{max-width:1000px;margin:0 auto;padding:24px}
-.no-print{display:flex;gap:10px;margin-bottom:20px;align-items:center}
-.btn-pdf{display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
-.btn-close{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#52525b;border:1px solid #e4e4e7;padding:10px 20px;border-radius:8px;font-size:13px;cursor:pointer}
+.no-print{display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
+.btn-pdf{display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn-close{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#52525b;border:1px solid #e4e4e7;padding:10px 20px;border-radius:8px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mob-tip{font-size:11px;color:#71717a;margin-top:6px;width:100%;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #e4e4e7;display:none;line-height:1.5}
 .header{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;padding:32px 36px;border-radius:14px;margin-bottom:18px;position:relative;overflow:hidden}
 .header::after{content:'';position:absolute;top:-60px;right:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.06)}
 .header-logo{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.65;margin-bottom:5px}
@@ -564,7 +635,7 @@ body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;color:#18181b;bac
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
 .b-g{background:#dcfce7;color:#16a34a}.b-a{background:#fef9c3;color:#ca8a04}.b-r{background:#fee2e2;color:#dc2626}.b-gr{background:#f4f4f5;color:#71717a}
 .sec{background:#fff;border:1px solid #e4e4e7;border-radius:12px;padding:20px 22px;margin-bottom:14px}
-.sec-hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #f4f4f5}
+.sec-hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #f4f4f5;flex-wrap:wrap;gap:4px}
 .sec-title{font-size:13px;font-weight:700;color:#18181b}
 .sec-sub{font-size:11px;color:#a1a1aa}
 .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
@@ -626,9 +697,33 @@ tr:last-child td{border-bottom:none}
   .header,.sec,.kpi{break-inside:avoid}
 }
 @media(max-width:700px){
-  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .wrap{padding:14px 12px}
+  .no-print{flex-direction:column;align-items:stretch;gap:8px}
+  .btn-pdf,.btn-close{width:100%;justify-content:center;padding:13px 16px;font-size:14px;border-radius:10px}
+  .mob-tip{display:block}
+  .header{padding:20px;border-radius:10px}
+  .header-title{font-size:20px}
+  .kpi-row{grid-template-columns:repeat(2,1fr);gap:10px}
   .metrics-grid{grid-template-columns:repeat(2,1fr)}
   .two-col{grid-template-columns:1fr}
+  .bar-row{flex-wrap:wrap;gap:6px}
+  .bar-name{width:100%;white-space:normal;font-size:12px;font-weight:600;margin-bottom:2px}
+  .bar-track{width:100%;height:18px}
+  .bar-meta{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left}
+  table,thead,tbody,tr,th,td{display:block}
+  thead tr{display:none}
+  tbody tr{margin-bottom:12px;background:#fff;border:1px solid #e4e4e7;border-radius:10px;padding:4px 0;overflow:hidden}
+  tbody tr.total-row{background:#f5f3ff}
+  td{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #f4f4f5;text-align:right}
+  td::before{content:attr(data-label);font-size:10px;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:.04em;text-align:left;flex-shrink:0;margin-right:8px}
+  td.td-name{font-size:13px;font-weight:600;flex-direction:column;align-items:flex-start;gap:2px}
+  td.td-name::before{font-size:10px;font-weight:600}
+  .total-row td{font-weight:700}
+}
+@media(max-width:380px){
+  .kpi-row{grid-template-columns:1fr}
+  .metrics-grid{grid-template-columns:1fr}
+  .eng-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -637,7 +732,11 @@ tr:last-child td{border-bottom:none}
 
 <div class="no-print">
   <button class="btn-pdf" onclick="window.print()">🖨️ &nbsp;Salvar como PDF / Imprimir</button>
-  <button class="btn-close" onclick="window.close()">✕ Fechar</button>
+  <button class="btn-close" onclick="
+    if(navigator.share){navigator.share({title:'Relatório de Performance — ${periodLabel}',text:'Análise técnica dos anúncios Meta Ads'}).catch(()=>{})}
+    else{try{navigator.clipboard.writeText(location.href);alert('Link copiado!')}catch(e){window.close()}}
+  ">↗ Compartilhar</button>
+  <div class="mob-tip">💡 Para salvar como PDF: toque nos 3 pontos do navegador → Imprimir → Salvar como PDF</div>
 </div>
 
 <div class="header">
@@ -779,27 +878,27 @@ tr:last-child td{border-bottom:none}
         const rv  = getActionValue(i.action_values, 'purchase')
         const r   = sp > 0 && rv > 0 ? rv / sp : 0
         return `<tr>
-          <td class="td-name" title="${i.campaign_name}">${i.campaign_name || '—'}</td>
-          <td><strong>${fC(sp)}</strong></td>
-          <td class="td-sec">${fN(re)}</td>
-          <td class="td-sec">${fN(im)}</td>
-          <td class="td-sec">${fN(cl)}</td>
-          <td class="td-sec">${fP(ct)}</td>
-          <td class="td-sec">${cp > 0 ? fC(cp) : '—'}</td>
-          <td>${cv > 0 ? fN(cv) : '—'}</td>
-          <td>${scorePill(r)}</td>
+          <td class="td-name" data-label="Campanha" title="${i.campaign_name}">${i.campaign_name || '—'}</td>
+          <td data-label="Investido"><strong>${fC(sp)}</strong></td>
+          <td class="td-sec" data-label="Alcance">${fN(re)}</td>
+          <td class="td-sec" data-label="Impressões">${fN(im)}</td>
+          <td class="td-sec" data-label="Cliques">${fN(cl)}</td>
+          <td class="td-sec" data-label="CTR">${fP(ct)}</td>
+          <td class="td-sec" data-label="CPC">${cp > 0 ? fC(cp) : '—'}</td>
+          <td data-label="Conversões">${cv > 0 ? fN(cv) : '—'}</td>
+          <td data-label="ROAS">${scorePill(r)}</td>
         </tr>`
       }).join('')}
       <tr class="total-row">
-        <td>TOTAL GERAL</td>
-        <td>${fC(totalSpend)}</td>
-        <td>${fN(totalReach)}</td>
-        <td>${fN(totalImpressions)}</td>
-        <td>${fN(totalClicks)}</td>
-        <td>${fP(avgCtr)}</td>
-        <td>${avgCpc > 0 ? fC(avgCpc) : '—'}</td>
-        <td>${totalConversions > 0 ? fN(totalConversions) : '—'}</td>
-        <td>${scorePill(roas)}</td>
+        <td data-label="Total">TOTAL GERAL</td>
+        <td data-label="Investido">${fC(totalSpend)}</td>
+        <td data-label="Alcance">${fN(totalReach)}</td>
+        <td data-label="Impressões">${fN(totalImpressions)}</td>
+        <td data-label="Cliques">${fN(totalClicks)}</td>
+        <td data-label="CTR">${fP(avgCtr)}</td>
+        <td data-label="CPC">${avgCpc > 0 ? fC(avgCpc) : '—'}</td>
+        <td data-label="Conversões">${totalConversions > 0 ? fN(totalConversions) : '—'}</td>
+        <td data-label="ROAS">${scorePill(roas)}</td>
       </tr>
     </tbody>
   </table>
@@ -808,24 +907,29 @@ tr:last-child td{border-bottom:none}
 <div class="footer">
   <div class="footer-brand">GesPub.ai</div>
   <div class="footer-text">Gerado automaticamente em ${generatedAt} · Período: ${periodLabel}</div>
-  <div class="footer-text">Dados fornecidos pela API oficial do Meta Ads. Para salvar como PDF use Ctrl+P → Salvar como PDF.</div>
+  <div class="footer-text">Dados pela API do Meta Ads · Para salvar como PDF: Ctrl+P → Salvar como PDF</div>
 </div>
 
 </div>
 </body>
 </html>`
 
+    if (isMobile) {
+      downloadHTML(html, `relatorio-${periodLabel.replace(/\s/g,'-')}.html`)
+      return
+    }
+
     try {
       const win = window.open('', '_blank')
       if (!win) {
-        alert('Seu navegador bloqueou o popup. Permita popups para este site e tente novamente.')
+        downloadHTML(html, `relatorio-${periodLabel.replace(/\s/g,'-')}.html`)
         return
       }
       win.document.write(html)
       win.document.close()
     } catch (err) {
       console.error('[openReport] Erro ao gerar relatório:', err)
-      alert('Erro ao gerar relatório: ' + (err?.message || 'erro desconhecido'))
+      downloadHTML(html, `relatorio-${periodLabel.replace(/\s/g,'-')}.html`)
     }
   }
 
