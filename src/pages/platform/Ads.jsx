@@ -20,6 +20,7 @@ import {
   getAdSets,
   updateAdStatus,
   getActionCount,
+  getActionValue,
   META_STATUS_LABELS,
 } from '../../lib/metaApi'
 import { formatPercent, formatCurrency, formatNumber } from '../../utils/formatters'
@@ -270,6 +271,10 @@ export default function Ads() {
                        + getActionCount(ins.actions, 'lead')
                        + getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
     const cpa          = conversions > 0 ? spend / conversions : 0
+    const revenue      = getActionValue(ins.action_values, 'purchase')
+    const conversionValue = Array.isArray(ins.action_values)
+      ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
+      : 0
     const reactions    = getActionCount(ins.actions, 'post_reaction')
     const pageLikes    = getActionCount(ins.actions, 'like')
     const comments     = getActionCount(ins.actions, 'comment')
@@ -290,7 +295,7 @@ export default function Ads() {
       adSetId,
       campaignName: ad.campaign?.name || campaignMap[campaignId] || campaignId || '—',
       adSetName:    ad.adset?.name    || adSetMap[adSetId]       || adSetId    || '—',
-      spend, impressions, clicks, ctr, cpc, frequency, reach, conversions, cpa,
+      spend, impressions, clicks, ctr, cpc, frequency, reach, conversions, cpa, revenue, conversionValue,
       reactions, pageLikes, comments,
       __account_name: ad.__account_name,
       __account_id: ad.__account_id
@@ -326,6 +331,7 @@ export default function Ads() {
   const tImp = filtered.reduce((s, c) => s + c.impressions, 0)
   const tConv = filtered.reduce((s, c) => s + c.conversions, 0)
   const tReach = filtered.reduce((s, c) => s + c.reach, 0)
+  const tConvValue = filtered.reduce((s, c) => s + c.conversionValue, 0)
 
   const handleSort = (field) => {
     if (sortField === field) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -574,8 +580,10 @@ export default function Ads() {
                       <p className="font-semibold text-txt-primary">{ad.conversions > 0 ? formatNumber(ad.conversions) : '—'}</p>
                     </div>
                     <div>
-                      <p className="text-txt-secondary">CPA</p>
-                      <p className="font-semibold text-txt-primary">{ad.cpa > 0 ? formatCurrency(ad.cpa, currency) : '—'}</p>
+                      <p className="text-txt-secondary">Valor Conv.</p>
+                      <p className={`font-semibold ${ad.conversionValue > 0 ? 'text-status-success' : 'text-txt-primary'}`}>
+                        {ad.conversionValue > 0 ? formatCurrency(ad.conversionValue, currency) : '—'}
+                      </p>
                     </div>
                   </div>
 
@@ -612,7 +620,8 @@ export default function Ads() {
                   { k: 'name', l: 'Anúncio' }, { k: 'campaignName', l: 'Campanha / Conjunto' }, { k: 'type', l: 'Tipo' },
                   { k: 'spend', l: 'Investido' }, { k: 'impressions', l: 'Impressões' }, { k: 'ctr', l: 'CTR' },
                   { k: 'cpc', l: 'CPC' }, { k: 'frequency', l: 'Frequência' }, { k: 'reactions', l: 'Curtidas' },
-                  { k: 'pageLikes', l: 'Seguidores' }, { k: 'conversions', l: 'Conversões' }, { k: 'cpa', l: 'CPA' }, { k: 'status', l: 'Status' }
+                  { k: 'pageLikes', l: 'Seguidores' }, { k: 'conversions', l: 'Conversões' },
+                  { k: 'conversionValue', l: 'Valor Conv.' }, { k: 'cpa', l: 'CPA' }, { k: 'status', l: 'Status' }
                 ].map((col) => (
                   <th key={col.k} onClick={() => handleSort(col.k)} className="text-left text-xs font-medium text-txt-secondary px-3 py-3 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-txt-primary">
                     {col.l} <SortIcon field={col.k} />
@@ -681,6 +690,13 @@ export default function Ads() {
                     <td className="px-3 py-3 text-sm text-txt-primary whitespace-nowrap">
                       {ad.conversions > 0 ? formatNumber(ad.conversions) : '—'}
                     </td>
+                    <td className="px-3 py-3 text-sm whitespace-nowrap">
+                      {ad.conversionValue > 0 ? (
+                        <span className="font-semibold text-status-success">
+                          {formatCurrency(ad.conversionValue, currency)}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="px-3 py-3 text-sm font-medium text-txt-primary whitespace-nowrap">
                       {ad.cpa > 0 ? formatCurrency(ad.cpa, currency) : '—'}
                     </td>
@@ -727,6 +743,7 @@ export default function Ads() {
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
+                <td className="px-3 py-3 text-sm font-bold text-status-success">{tConvValue > 0 ? formatCurrency(tConvValue, currency) : '—'}</td>
                 <td className="px-3 py-3 text-sm font-bold text-txt-primary">{tConv > 0 ? formatCurrency(tSpend / tConv, currency) : '—'}</td>
                 <td className="px-3 py-3"></td>
                 <td className="px-3 py-3"></td>

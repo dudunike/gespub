@@ -17,6 +17,7 @@ import {
   updateAdSetStatus,
   updateAdSetBudget,
   getActionCount,
+  getActionValue,
   META_STATUS_LABELS,
 } from '../../lib/metaApi'
 import { formatCurrency, formatNumber, formatPercent, formatRoas } from '../../utils/formatters'
@@ -157,8 +158,13 @@ export default function AdSets() {
     const leads      = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
     const totalConvs = purchases + whatsapp + leads
     const cpa        = spend > 0 && totalConvs > 0 ? spend / totalConvs : 0
+    const revenue    = getActionValue(ins.action_values, 'purchase')
+    const conversionValue = Array.isArray(ins.action_values)
+      ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
+      : 0
+    const roas = spend > 0 && revenue > 0 ? revenue / spend : 0
 
-    return { ...adSet, status, budget, spend, reach, impressions, ctr, cpc, frequency, cpm, purchases, whatsapp, leads, totalConvs, cpa }
+    return { ...adSet, status, budget, spend, reach, impressions, ctr, cpc, frequency, cpm, purchases, whatsapp, leads, totalConvs, cpa, revenue, conversionValue, roas }
   })
 
   prepared.sort((a, b) => {
@@ -175,7 +181,10 @@ export default function AdSets() {
   const tImp = prepared.reduce((s, c) => s + c.impressions, 0)
   const tReach = prepared.reduce((s, c) => s + c.reach, 0)
   const tConv = prepared.reduce((s, c) => s + c.totalConvs, 0)
+  const tRev = prepared.reduce((s, c) => s + c.revenue, 0)
+  const tConvValue = prepared.reduce((s, c) => s + c.conversionValue, 0)
   const tCpa = tConv > 0 ? tSpend / tConv : 0
+  const tRoas = tSpend > 0 ? tRev / tSpend : 0
 
   const handleSort = (field) => {
     if (sortField === field) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -277,7 +286,8 @@ export default function AdSets() {
                   { k: 'name', l: 'Nome' }, { k: 'campaign_id', l: 'Campanha' }, { k: 'budget', l: 'Orç. diário' },
                   { k: 'spend', l: 'Investido' }, { k: 'reach', l: 'Alcance' }, { k: 'impressions', l: 'Impressões' },
                   { k: 'ctr', l: 'CTR' }, { k: 'cpc', l: 'CPC' }, { k: 'totalConvs', l: 'Conversões' },
-                  { k: 'cpa', l: 'CPA' }, { k: 'frequency', l: 'Frequência' }, { k: 'cpm', l: 'CPM' }, { k: 'status', l: 'Status' }
+                  { k: 'conversionValue', l: 'Valor Conv.' }, { k: 'cpa', l: 'CPA' }, { k: 'roas', l: 'ROAS' },
+                  { k: 'frequency', l: 'Frequência' }, { k: 'cpm', l: 'CPM' }, { k: 'status', l: 'Status' }
                 ].map((col) => (
                   <th key={col.k} onClick={() => handleSort(col.k)} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-txt-primary">
                     {col.l} <SortIcon field={col.k} />
@@ -349,9 +359,23 @@ export default function AdSets() {
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      {adSet.conversionValue > 0 ? (
+                        <span className="font-semibold text-status-success">
+                          {formatCurrency(adSet.conversionValue, currency)}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {adSet.cpa > 0 ? (
                         <span className={`font-semibold ${adSet.cpa > 50 ? 'text-status-error' : adSet.cpa > 20 ? 'text-status-warning' : 'text-status-success'}`}>
                           {formatCurrency(adSet.cpa, currency)}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      {adSet.roas > 0 ? (
+                        <span className={adSet.roas >= 3 ? 'text-status-success font-medium' : adSet.roas >= 2 ? 'text-txt-primary' : 'text-status-error'}>
+                          {formatRoas(adSet.roas)}
                         </span>
                       ) : '—'}
                     </td>
@@ -423,7 +447,9 @@ export default function AdSets() {
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-status-success">{tConvValue > 0 ? formatCurrency(tConvValue, currency) : '—'}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpa, currency)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatRoas(tRoas)}</td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>

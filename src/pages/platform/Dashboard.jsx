@@ -195,8 +195,13 @@ export default function Dashboard() {
   const totalLeads        = insights.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
   const totalConversions  = totalPurchases + totalWhatsapp + totalLeads
 
-  // ROAS e CPA
+  // ROAS, CPA e Valor de Conversão
   const totalRevenue      = insights.reduce((s, i) => s + getActionValue(i.action_values, 'purchase'), 0)
+  // Valor total de conversão = purchase + leads (offsite) + quaisquer outros action_values disponíveis
+  const totalConversionValue = insights.reduce((s, i) => {
+    if (!Array.isArray(i.action_values)) return s
+    return s + i.action_values.reduce((sv, av) => sv + Number(av.value || 0), 0)
+  }, 0)
   const roas              = totalSpend > 0 && totalRevenue > 0 ? totalRevenue / totalSpend : 0
   const cpa               = totalSpend > 0 && totalConversions > 0 ? totalSpend / totalConversions : 0
 
@@ -363,7 +368,17 @@ export default function Dashboard() {
       : roas > 0  ? { label: 'Atenção',       color: '#dc2626', bg: '#fee2e2', emoji: '⚠️', desc: 'Estratégia precisa de ajustes' }
       : { label: 'Em andamento', color: '#7c3aed', bg: '#f5f3ff', emoji: '📋', desc: 'Acompanhamento em progresso' }
 
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+    const openInNewTab = (htmlContent) => {
+      try {
+        const win = window.open('', '_blank')
+        if (win) {
+          win.document.write(htmlContent)
+          win.document.close()
+          return true
+        }
+      } catch (e) {}
+      return false
+    }
 
     const downloadHTML = (html, name) => {
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
@@ -387,9 +402,9 @@ export default function Dashboard() {
 body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#f5f3ff;-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#18181b}
 .wrap{max-width:700px;margin:0 auto;padding:24px 18px}
 .no-print{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
-.btn-pdf{display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.btn-close{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#52525b;border:1px solid #e4e4e7;padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.mob-tip{font-size:11px;color:#71717a;margin-top:6px;line-height:1.5;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #e4e4e7;display:none}
+.btn-pdf{display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.btn-close{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#52525b;border:1px solid #e4e4e7;padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.mob-tip{font-size:12px;color:#52525b;margin-top:8px;line-height:1.6;padding:10px 14px;background:#fef9c3;border-radius:8px;border:1px solid #fde047;display:none;width:100%}
 
 /* ── Header ── */
 .header{background:linear-gradient(135deg,#7c3aed 0%,#4c1d95 100%);color:#fff;border-radius:20px;padding:36px 32px 28px;margin-bottom:16px;position:relative;overflow:hidden}
@@ -505,41 +520,47 @@ body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#f5f3f
   .eng-row{grid-template-columns:1fr}
   .soc-row{grid-template-columns:1fr}
 }
-@media print{body{background:#fff}.no-print{display:none!important}.wrap{padding:8px;max-width:100%}.card,.kpi,.conv,.eng,.soc{break-inside:avoid}}
+@media print{
+  body{background:#fff!important}
+  .no-print{display:none!important}
+  .wrap{padding:8px;max-width:100%}
+  .card,.kpi,.conv,.eng,.soc{break-inside:avoid}
+  .header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 function gerarPDF(){
   var btn=document.getElementById('btn-dl');
-  var np=document.querySelector('.no-print');
-  btn.innerHTML='⏳ Gerando PDF...';btn.disabled=true;
-  np.style.display='none';
-  html2pdf().set({
-    margin:[6,4,6,4],
-    filename:'resultados-${periodShort.replace(/\//g,'-')}.pdf',
-    image:{type:'jpeg',quality:0.98},
-    html2canvas:{scale:2,useCORS:true,logging:false},
-    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
-  }).from(document.querySelector('.wrap')).save().then(function(){
-    np.style.display='flex';
-    btn.innerHTML='✅ PDF baixado!';btn.disabled=false;
-    setTimeout(function(){btn.innerHTML='📥 Baixar PDF';},3000);
-  }).catch(function(){
-    np.style.display='flex';btn.innerHTML='📥 Baixar PDF';btn.disabled=false;
+  btn.innerHTML='⏳ Aguarde...';btn.disabled=true;
+  setTimeout(function(){
     window.print();
-  });
+    btn.innerHTML='📥 Salvar como PDF';btn.disabled=false;
+  },300);
 }
 function compartilhar(){
-  if(navigator.share){navigator.share({title:'Resultados ${periodShort}',text:'Confira os resultados dos seus anúncios!'}).catch(function(){});}
-  else{try{navigator.clipboard.writeText(location.href);alert('Link copiado!');}catch(e){}}
+  if(navigator.share){
+    navigator.share({title:'Resultados ${periodShort}',text:'Confira os resultados dos seus anúncios!',url:location.href}).catch(function(){});
+  } else {
+    try{navigator.clipboard.writeText(location.href);alert('Link copiado!');}catch(e){}
+  }
 }
+// Detecta mobile e mostra dica
+(function(){
+  if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){
+    var tip = document.getElementById('mob-tip');
+    if(tip) tip.style.display='block';
+    var btn = document.getElementById('btn-dl');
+    if(btn) btn.innerHTML = '📄 Salvar como PDF';
+  }
+})();
 </script>
 </head>
 <body>
 <div class="wrap">
 <div class="no-print">
-  <button class="btn-pdf" id="btn-dl" onclick="gerarPDF()">📥 Baixar PDF</button>
+  <button class="btn-pdf" id="btn-dl" onclick="gerarPDF()">📥 Salvar como PDF</button>
   <button class="btn-close" onclick="compartilhar()">↗ Compartilhar</button>
+  <div class="mob-tip" id="mob-tip">📱 <strong>No celular:</strong> toque em "Salvar como PDF" → seu navegador abrirá a opção de imprimir → escolha <strong>"Salvar como PDF"</strong> ou <strong>"Imprimir"</strong>.</div>
 </div>
 
 <!-- HEADER -->
@@ -699,21 +720,7 @@ ${hasMultiAccounts ? `
 </body>
 </html>`
 
-    if (isMobile) {
-      downloadHTML(html, `resultados-${periodShort.replace(/\//g,'-')}.html`)
-      return
-    }
-
-    try {
-      const win = window.open('', '_blank')
-      if (!win) {
-        downloadHTML(html, `resultados-${periodShort.replace(/\//g,'-')}.html`)
-        return
-      }
-      win.document.write(html)
-      win.document.close()
-    } catch (err) {
-      console.error('[openClientReport] Erro ao gerar relatório:', err)
+    if (!openInNewTab(html)) {
       downloadHTML(html, `resultados-${periodShort.replace(/\//g,'-')}.html`)
     }
   }
@@ -821,7 +828,17 @@ ${hasMultiAccounts ? `
     const purchDeg = totalConversions > 0 ? (totalPurchases / totalConversions) * 360 : 120
     const wappDeg  = totalConversions > 0 ? (totalWhatsapp  / totalConversions) * 360 : 120
 
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+    const openInNewTabR = (htmlContent) => {
+      try {
+        const win = window.open('', '_blank')
+        if (win) {
+          win.document.write(htmlContent)
+          win.document.close()
+          return true
+        }
+      } catch (e) {}
+      return false
+    }
 
     const downloadHTML = (content, name) => {
       const blob = new Blob([content], { type: 'text/html;charset=utf-8' })
@@ -845,9 +862,9 @@ ${hasMultiAccounts ? `
 body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;color:#18181b;background:#f4f4f5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .wrap{max-width:1000px;margin:0 auto;padding:24px}
 .no-print{display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
-.btn-pdf{display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.btn-close{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#52525b;border:1px solid #e4e4e7;padding:10px 20px;border-radius:8px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.mob-tip{font-size:11px;color:#71717a;margin-top:6px;width:100%;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #e4e4e7;display:none;line-height:1.5}
+.btn-pdf{display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.btn-close{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#52525b;border:1px solid #e4e4e7;padding:10px 20px;border-radius:8px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.mob-tip{font-size:12px;color:#52525b;margin-top:8px;width:100%;padding:10px 14px;background:#fef9c3;border-radius:8px;border:1px solid #fde047;display:none;line-height:1.6}
 .header{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;padding:32px 36px;border-radius:14px;margin-bottom:18px;position:relative;overflow:hidden}
 .header::after{content:'';position:absolute;top:-60px;right:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.06)}
 .header-logo{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.65;margin-bottom:5px}
@@ -954,42 +971,47 @@ tr:last-child td{border-bottom:none}
   .metrics-grid{grid-template-columns:1fr}
   .eng-grid{grid-template-columns:1fr}
 }
-@media print{body{background:#fff}.no-print{display:none!important}.wrap{max-width:100%;padding:10px}.header,.sec,.kpi{break-inside:avoid}}
+@media print{
+  body{background:#fff!important}
+  .no-print{display:none!important}
+  .wrap{max-width:100%;padding:10px}
+  .header,.sec,.kpi{break-inside:avoid}
+  .header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 function gerarPDF(){
   var btn=document.getElementById('btn-dl');
-  var np=document.querySelector('.no-print');
-  btn.innerHTML='⏳ Gerando PDF...';btn.disabled=true;
-  np.style.display='none';
-  html2pdf().set({
-    margin:[5,4,5,4],
-    filename:'relatorio-${periodLabel.replace(/\s/g,'-')}.pdf',
-    image:{type:'jpeg',quality:0.98},
-    html2canvas:{scale:2,useCORS:true,logging:false},
-    jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}
-  }).from(document.querySelector('.wrap')).save().then(function(){
-    np.style.display='flex';
-    btn.innerHTML='✅ PDF baixado!';btn.disabled=false;
-    setTimeout(function(){btn.innerHTML='📥 Baixar PDF';},3000);
-  }).catch(function(){
-    np.style.display='flex';btn.innerHTML='📥 Baixar PDF';btn.disabled=false;
+  btn.innerHTML='⏳ Aguarde...';btn.disabled=true;
+  setTimeout(function(){
     window.print();
-  });
+    btn.innerHTML='📄 Salvar como PDF';btn.disabled=false;
+  },300);
 }
 function compartilhar(){
-  if(navigator.share){navigator.share({title:'Relatório de Performance — ${periodLabel}',text:'Análise técnica dos anúncios Meta Ads'}).catch(function(){});}
-  else{try{navigator.clipboard.writeText(location.href);alert('Link copiado!');}catch(e){}}
+  if(navigator.share){
+    navigator.share({title:'Relatório de Performance — ${periodLabel}',text:'Análise técnica dos anúncios Meta Ads',url:location.href}).catch(function(){});
+  } else {
+    try{navigator.clipboard.writeText(location.href);alert('Link copiado!');}catch(e){}
+  }
 }
+(function(){
+  if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){
+    var tip=document.getElementById('mob-tip');
+    if(tip) tip.style.display='block';
+    var btn=document.getElementById('btn-dl');
+    if(btn) btn.innerHTML='📄 Salvar como PDF';
+  }
+})();
 </script>
 </head>
 <body>
 <div class="wrap">
 
 <div class="no-print">
-  <button class="btn-pdf" id="btn-dl" onclick="gerarPDF()">📥 Baixar PDF</button>
+  <button class="btn-pdf" id="btn-dl" onclick="gerarPDF()">📥 Salvar como PDF</button>
   <button class="btn-close" onclick="compartilhar()">↗ Compartilhar</button>
+  <div class="mob-tip" id="mob-tip">📱 <strong>No celular:</strong> toque em "Salvar como PDF" → seu navegador abrirá a opção de imprimir → escolha <strong>"Salvar como PDF"</strong> ou <strong>"Imprimir"</strong>.</div>
 </div>
 
 <div class="header">
@@ -1173,21 +1195,7 @@ ${cmpSection}
 </body>
 </html>`
 
-    if (isMobile) {
-      downloadHTML(html, `relatorio-${periodLabel.replace(/\s/g,'-')}.html`)
-      return
-    }
-
-    try {
-      const win = window.open('', '_blank')
-      if (!win) {
-        downloadHTML(html, `relatorio-${periodLabel.replace(/\s/g,'-')}.html`)
-        return
-      }
-      win.document.write(html)
-      win.document.close()
-    } catch (err) {
-      console.error('[openReport] Erro ao gerar relatório:', err)
+    if (!openInNewTabR(html)) {
       downloadHTML(html, `relatorio-${periodLabel.replace(/\s/g,'-')}.html`)
     }
   }
@@ -1366,12 +1374,25 @@ ${cmpSection}
           loading={loading}
         />
         <MetricCard
+          label="Valor de conversão"
+          value={totalConversionValue > 0 ? formatCurrency(totalConversionValue, currency) : '—'}
+          sub={totalConversionValue > 0 && totalConversions > 0
+            ? `Ticket médio ${formatCurrency(totalConversionValue / totalConversions, currency)}`
+            : 'Sem valor de conversão rastreado'}
+          highlight={totalConversionValue > 0}
+          loading={loading}
+        />
+        <MetricCard
           label="ROAS"
           value={roas > 0 ? formatRoas(roas) : '—'}
           sub={totalRevenue > 0 ? `Receita ${formatCurrency(totalRevenue, currency)}` : 'Sem valor de compra rastreado'}
           highlight={roas >= 3}
           loading={loading}
         />
+      </div>
+
+      {/* ── KPIs terciários (linha 3): CPA ── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <MetricCard
           label="CPA (custo/resultado)"
           value={cpa > 0 ? formatCurrency(cpa, currency) : '—'}
@@ -1562,8 +1583,15 @@ ${cmpSection}
               {topCampaigns.map((ins) => {
                 const spend   = Number(ins.spend || 0)
                 const revenue = getActionValue(ins.action_values, 'purchase')
-                const r       = spend > 0 && revenue > 0 ? revenue / spend : 0
-                const ctr     = Number(ins.ctr || 0)
+                const convValue = Array.isArray(ins.action_values)
+                  ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
+                  : 0
+                const purchases = getActionCount(ins.actions, 'purchase')
+                const whatsapp  = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
+                const leads     = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
+                const convs     = purchases + whatsapp + leads
+                const r         = spend > 0 && revenue > 0 ? revenue / spend : 0
+                const ctr       = Number(ins.ctr || 0)
                 return (
                   <div key={ins.campaign_id} className="flex items-center gap-3 py-3 border-b border-border last:border-0">
                     <div className="flex-1 min-w-0">
@@ -1571,10 +1599,16 @@ ${cmpSection}
                       <p className="text-xs text-txt-secondary mt-0.5">
                         {formatNumber(Number(ins.impressions || 0))} impressões
                         {ctr > 0 && ` · CTR ${ctr.toFixed(1)}%`}
+                        {convs > 0 && ` · ${formatNumber(convs)} conv.`}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-semibold text-txt-primary">{formatCurrency(spend, currency)}</p>
+                      {convValue > 0 && (
+                        <p className="text-xs font-medium text-status-success">
+                          💰 {formatCurrency(convValue, currency)}
+                        </p>
+                      )}
                       {r > 0 && (
                         <p className={`text-xs font-medium ${r >= 3 ? 'text-status-success' : r >= 2 ? 'text-txt-secondary' : 'text-status-error'}`}>
                           ROAS {formatRoas(r)}
@@ -1596,7 +1630,14 @@ ${cmpSection}
         <div className="space-y-4">
           {/* Painel de conversões */}
           <div className="bg-white border border-border rounded-card p-5">
-            <h2 className="text-sm font-semibold text-txt-primary mb-4">Conversões por tipo</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-txt-primary">Conversões por tipo</h2>
+              {totalConversionValue > 0 && (
+                <span className="text-xs font-semibold text-status-success bg-status-successBg px-2 py-0.5 rounded-full">
+                  💰 {formatCurrency(totalConversionValue, currency)}
+                </span>
+              )}
+            </div>
             {loading ? (
               <div className="space-y-2">
                 {[1,2,3].map(i => <div key={i} className="h-8 bg-surface-bg rounded animate-pulse" />)}
@@ -1628,6 +1669,12 @@ ${cmpSection}
                   <p className="text-xs text-txt-secondary text-center py-2">
                     Nenhuma conversão rastreada no período.
                   </p>
+                )}
+                {totalConversionValue > 0 && totalConversions > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs">
+                    <span className="text-txt-secondary">Ticket médio por conversão</span>
+                    <span className="font-semibold text-txt-primary">{formatCurrency(totalConversionValue / totalConversions, currency)}</span>
+                  </div>
                 )}
               </div>
             )}

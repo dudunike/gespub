@@ -182,13 +182,16 @@ export default function Campaigns() {
     const totalConversions = purchases + whatsapp + leads
 
     const revenue = getActionValue(ins.action_values, 'purchase')
+    const conversionValue = Array.isArray(ins.action_values)
+      ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
+      : 0
     const roas = spend > 0 && revenue > 0 ? revenue / spend : 0
     const cpa  = spend > 0 && totalConversions > 0 ? spend / totalConversions : 0
 
     const budget = c.daily_budget ? Number(c.daily_budget) / 100 : c.lifetime_budget ? Number(c.lifetime_budget) / 100 : 0
     const status = c.effective_status || c.status
 
-    return { ...c, spend, impressions, clicks, ctr, cpc, purchases, whatsapp, leads, totalConversions, revenue, roas, cpa, budget, status }
+    return { ...c, spend, impressions, clicks, ctr, cpc, purchases, whatsapp, leads, totalConversions, revenue, conversionValue, roas, cpa, budget, status }
   })
 
   prepared.sort((a, b) => {
@@ -206,6 +209,7 @@ export default function Campaigns() {
   const tClicks = prepared.reduce((s, c) => s + c.clicks, 0)
   const tConv = prepared.reduce((s, c) => s + c.totalConversions, 0)
   const tRev = prepared.reduce((s, c) => s + c.revenue, 0)
+  const tConvValue = prepared.reduce((s, c) => s + c.conversionValue, 0)
   const tCtr = tImp > 0 ? (tClicks / tImp) * 100 : 0
   const tCpc = tClicks > 0 ? tSpend / tClicks : 0
   const tCpa = tConv > 0 ? tSpend / tConv : 0
@@ -304,7 +308,7 @@ export default function Campaigns() {
                   { k: 'name', l: 'Campanha' }, { k: 'objective', l: 'Objetivo' }, { k: 'budget', l: 'Orçamento/dia' },
                   { k: 'spend', l: 'Investido' }, { k: 'impressions', l: 'Impressões' }, { k: 'clicks', l: 'Cliques' },
                   { k: 'ctr', l: 'CTR' }, { k: 'cpc', l: 'CPC' }, { k: 'totalConversions', l: 'Conversões' },
-                  { k: 'cpa', l: 'CPA' }, { k: 'roas', l: 'ROAS' }, { k: 'status', l: 'Status' }
+                  { k: 'conversionValue', l: 'Valor Conv.' }, { k: 'cpa', l: 'CPA' }, { k: 'roas', l: 'ROAS' }, { k: 'status', l: 'Status' }
                 ].map((col) => (
                   <th key={col.k} onClick={() => handleSort(col.k)} className="text-left text-xs font-medium text-txt-secondary px-4 py-3 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-txt-primary">
                     {col.l} <SortIcon field={col.k} />
@@ -367,6 +371,13 @@ export default function Campaigns() {
                           )}
                         </div>
                       ) : <span className="text-sm text-txt-secondary">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      {c.conversionValue > 0 ? (
+                        <span className="font-semibold text-status-success">
+                          {formatCurrency(c.conversionValue, currency)}
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {c.cpa > 0 ? (
@@ -440,6 +451,7 @@ export default function Campaigns() {
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatPercent(tCtr)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpc, currency)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatNumber(tConv)}</td>
+                <td className="px-4 py-3 text-sm font-bold text-status-success">{tConvValue > 0 ? formatCurrency(tConvValue, currency) : '—'}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatCurrency(tCpa, currency)}</td>
                 <td className="px-4 py-3 text-sm font-bold text-txt-primary">{formatRoas(tRoas)}</td>
                 <td className="px-4 py-3"></td>
