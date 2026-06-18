@@ -11,6 +11,7 @@ import {
   getCampaignInsights,
   getActionCount,
   getActionValue,
+  getPurchaseValue,
   getPageFollowers,
   getInstagramPostStats,
   DATE_PRESETS,
@@ -195,13 +196,10 @@ export default function Dashboard() {
   const totalLeads        = insights.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
   const totalConversions  = totalPurchases + totalWhatsapp + totalLeads
 
-  // ROAS, CPA e Valor de Conversão
-  const totalRevenue      = insights.reduce((s, i) => s + getActionValue(i.action_values, 'purchase'), 0)
-  // Valor total de conversão = purchase + leads (offsite) + quaisquer outros action_values disponíveis
-  const totalConversionValue = insights.reduce((s, i) => {
-    if (!Array.isArray(i.action_values)) return s
-    return s + i.action_values.reduce((sv, av) => sv + Number(av.value || 0), 0)
-  }, 0)
+  // ROAS, CPA e Receita de Vendas
+  // getPurchaseValue verifica omni_purchase → fb_pixel_purchase → purchase (evita dupla contagem)
+  const totalRevenue      = insights.reduce((s, i) => s + getPurchaseValue(i.action_values), 0)
+  const totalConversionValue = totalRevenue
   const roas              = totalSpend > 0 && totalRevenue > 0 ? totalRevenue / totalSpend : 0
   const cpa               = totalSpend > 0 && totalConversions > 0 ? totalSpend / totalConversions : 0
 
@@ -296,7 +294,7 @@ export default function Dashboard() {
       const re  = arr.reduce((s, i) => s + Number(i.reach || 0), 0)
       const cl  = arr.reduce((s, i) => s + Number(i.clicks || 0), 0)
       const im  = arr.reduce((s, i) => s + Number(i.impressions || 0), 0)
-      const rv  = arr.reduce((s, i) => s + getActionValue(i.action_values, 'purchase'), 0)
+      const rv  = arr.reduce((s, i) => s + getPurchaseValue(i.action_values), 0)
       const pu  = arr.reduce((s, i) => s + getActionCount(i.actions, 'purchase'), 0)
       const wa  = arr.reduce((s, i) => s + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d'), 0)
       const ld  = arr.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
@@ -749,7 +747,7 @@ ${hasMultiAccounts ? `
       const re = arr.reduce((s, i) => s + Number(i.reach || 0), 0)
       const cl = arr.reduce((s, i) => s + Number(i.clicks || 0), 0)
       const im = arr.reduce((s, i) => s + Number(i.impressions || 0), 0)
-      const rv = arr.reduce((s, i) => s + getActionValue(i.action_values, 'purchase'), 0)
+      const rv = arr.reduce((s, i) => s + getPurchaseValue(i.action_values), 0)
       const pu = arr.reduce((s, i) => s + getActionCount(i.actions, 'purchase'), 0)
       const wa = arr.reduce((s, i) => s + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d'), 0)
       const ld = arr.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
@@ -828,7 +826,7 @@ ${hasMultiAccounts ? `
     const maxSpend     = sortedC.length > 0 ? Number(sortedC[0].spend) : 1
     const chartTop     = sortedC.slice(0, 10).map(i => {
       const sp = Number(i.spend || 0)
-      const rv = getActionValue(i.action_values, 'purchase')
+      const rv = getPurchaseValue(i.action_values)
       const r  = sp > 0 && rv > 0 ? rv / sp : 0
       return { name: i.campaign_name || '—', spend: sp, revenue: rv, roas: r, pct: Math.round((sp / maxSpend) * 100) }
     })
@@ -1170,7 +1168,7 @@ ${cmpSection}
         const ct  = im > 0 ? (cl / im) * 100 : 0
         const cp  = cl > 0 ? sp / cl : 0
         const cv  = getActionCount(i.actions, 'purchase') + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d')
-        const rv  = getActionValue(i.action_values, 'purchase')
+        const rv  = getPurchaseValue(i.action_values)
         const r   = sp > 0 && rv > 0 ? rv / sp : 0
         return `<tr>
           <td class="td-name" data-label="Campanha" title="${i.campaign_name}">${i.campaign_name || '—'}</td>
@@ -1223,7 +1221,7 @@ ${cmpSection}
   const chartData = insights.slice(0, 8).map((i) => ({
     name: (i.campaign_name || '').split(' ').slice(0, 2).join(' '),
     Investido: Number(i.spend || 0),
-    Receita: getActionValue(i.action_values, 'purchase'),
+    Receita: getPurchaseValue(i.action_values),
   }))
 
   // ── Tela "sem conexão" ──
@@ -1388,12 +1386,12 @@ ${cmpSection}
           loading={loading}
         />
         <MetricCard
-          label="Valor de conversão"
-          value={totalConversionValue > 0 ? formatCurrency(totalConversionValue, currency) : '—'}
-          sub={totalConversionValue > 0 && totalConversions > 0
-            ? `Ticket médio ${formatCurrency(totalConversionValue / totalConversions, currency)}`
-            : 'Sem valor de conversão rastreado'}
-          highlight={totalConversionValue > 0}
+          label="Receita de vendas"
+          value={totalRevenue > 0 ? formatCurrency(totalRevenue, currency) : '—'}
+          sub={totalRevenue > 0 && totalConversions > 0
+            ? `Ticket médio ${formatCurrency(totalRevenue / totalConversions, currency)}`
+            : 'Sem receita de vendas rastreada'}
+          highlight={totalRevenue > 0}
           loading={loading}
         />
         <MetricCard
@@ -1596,7 +1594,7 @@ ${cmpSection}
             <div className="space-y-0">
               {topCampaigns.map((ins) => {
                 const spend   = Number(ins.spend || 0)
-                const revenue = getActionValue(ins.action_values, 'purchase')
+                const revenue = getPurchaseValue(ins.action_values)
                 const convValue = Array.isArray(ins.action_values)
                   ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
                   : 0

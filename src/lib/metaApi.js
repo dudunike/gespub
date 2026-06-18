@@ -372,6 +372,23 @@ export function getActionValue(actionValues, actionType) {
   return av ? Number(av.value) : 0
 }
 
+// Retorna o valor de vendas da campanha verificando todos os tipos de compra do Meta:
+// omni_purchase (todos os canais) → fb_pixel_purchase (pixel) → purchase (loja/catálogo)
+// Usa o primeiro que tiver valor > 0 para evitar dupla contagem.
+export function getPurchaseValue(actionValues) {
+  if (!Array.isArray(actionValues) || actionValues.length === 0) return 0
+  const purchaseTypes = [
+    'omni_purchase',
+    'offsite_conversion.fb_pixel_purchase',
+    'purchase',
+  ]
+  for (const type of purchaseTypes) {
+    const av = actionValues.find((x) => x.action_type === type)
+    if (av && Number(av.value) > 0) return Number(av.value)
+  }
+  return 0
+}
+
 // Conversões disponíveis no Meta para agentes e filtros
 export const META_CONVERSIONS = [
   { id: 'purchase', label: 'Compras (Purchase)' },

@@ -17,7 +17,7 @@ import {
   updateAdSetStatus,
   updateAdSetBudget,
   getActionCount,
-  getActionValue,
+  getPurchaseValue,
   META_STATUS_LABELS,
 } from '../../lib/metaApi'
 import { formatCurrency, formatNumber, formatPercent, formatRoas } from '../../utils/formatters'
@@ -158,7 +158,7 @@ export default function AdSets() {
     const leads      = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
     const totalConvs = purchases + whatsapp + leads
     const cpa        = spend > 0 && totalConvs > 0 ? spend / totalConvs : 0
-    const revenue    = getActionValue(ins.action_values, 'purchase')
+    const revenue    = getPurchaseValue(ins.action_values)
     const conversionValue = Array.isArray(ins.action_values)
       ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
       : 0

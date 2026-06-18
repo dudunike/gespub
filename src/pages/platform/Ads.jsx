@@ -20,7 +20,7 @@ import {
   getAdSets,
   updateAdStatus,
   getActionCount,
-  getActionValue,
+  getPurchaseValue,
   META_STATUS_LABELS,
 } from '../../lib/metaApi'
 import { formatPercent, formatCurrency, formatNumber } from '../../utils/formatters'
@@ -271,7 +271,7 @@ export default function Ads() {
                        + getActionCount(ins.actions, 'lead')
                        + getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
     const cpa          = conversions > 0 ? spend / conversions : 0
-    const revenue      = getActionValue(ins.action_values, 'purchase')
+    const revenue      = getPurchaseValue(ins.action_values)
     const conversionValue = Array.isArray(ins.action_values)
       ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
       : 0

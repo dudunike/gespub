@@ -13,7 +13,7 @@ import {
   updateCampaignStatus,
   updateCampaignBudget,
   getActionCount,
-  getActionValue,
+  getPurchaseValue,
   META_STATUS_LABELS,
   META_OBJECTIVE_LABELS,
 } from '../../lib/metaApi'
@@ -181,7 +181,7 @@ export default function Campaigns() {
     const leads     = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
     const totalConversions = purchases + whatsapp + leads
 
-    const revenue = getActionValue(ins.action_values, 'purchase')
+    const revenue = getPurchaseValue(ins.action_values)
     const conversionValue = Array.isArray(ins.action_values)
       ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
       : 0
