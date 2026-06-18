@@ -238,6 +238,16 @@ export default function Dashboard() {
 
   const handleGerarRelatorio = async (type) => {
     setReportLoading(true)
+    // Abre a janela ANTES do await para não perder o contexto de clique do usuário
+    let preWin = null
+    try {
+      preWin = window.open('', '_blank')
+      if (preWin) {
+        preWin.document.write('<html><body style="font-family:sans-serif;padding:2rem;color:#333;background:#f5f3ff"><p style="font-size:1rem">⏳ Gerando relatório...</p></body></html>')
+        preWin.document.close()
+      }
+    } catch (_) {}
+
     let compData = []
     let compRange = null
     if (compareWith !== 'none') {
@@ -257,11 +267,11 @@ export default function Dashboard() {
     setShowReportChoice(false)
     setReportType(null)
     setReportLoading(false)
-    if (type === 'client') openClientReport(compData, compRange)
-    else openReport(compData, compRange)
+    if (type === 'client') openClientReport(compData, compRange, preWin)
+    else openReport(compData, compRange, preWin)
   }
 
-  const openClientReport = (compareData = [], compareRange = null) => {
+  const openClientReport = (compareData = [], compareRange = null, preWin = null) => {
     const fC  = (v) => formatCurrency(Number(v || 0), currency)
     const fN  = (v) => Number(v || 0).toLocaleString('pt-BR')
 
@@ -370,8 +380,9 @@ export default function Dashboard() {
 
     const openInNewTab = (htmlContent) => {
       try {
-        const win = window.open('', '_blank')
+        const win = preWin || window.open('', '_blank')
         if (win) {
+          win.document.open()
           win.document.write(htmlContent)
           win.document.close()
           return true
@@ -381,6 +392,7 @@ export default function Dashboard() {
     }
 
     const downloadHTML = (html, name) => {
+      if (preWin) { try { preWin.close() } catch (_) {} }
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -725,7 +737,7 @@ ${hasMultiAccounts ? `
     }
   }
 
-  const openReport = (compareData = [], compareRange = null) => {
+  const openReport = (compareData = [], compareRange = null, preWin = null) => {
     if (!canDownloadReport || insights.length === 0) return
 
     const fC  = (v) => formatCurrency(Number(v || 0), currency)
@@ -830,8 +842,9 @@ ${hasMultiAccounts ? `
 
     const openInNewTabR = (htmlContent) => {
       try {
-        const win = window.open('', '_blank')
+        const win = preWin || window.open('', '_blank')
         if (win) {
+          win.document.open()
           win.document.write(htmlContent)
           win.document.close()
           return true
@@ -841,6 +854,7 @@ ${hasMultiAccounts ? `
     }
 
     const downloadHTML = (content, name) => {
+      if (preWin) { try { preWin.close() } catch (_) {} }
       const blob = new Blob([content], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
