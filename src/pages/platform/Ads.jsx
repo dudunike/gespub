@@ -20,6 +20,7 @@ import {
   getAdSets,
   updateAdStatus,
   getActionCount,
+  getPurchaseCount,
   getPurchaseValue,
   META_STATUS_LABELS,
 } from '../../lib/metaApi'
@@ -267,14 +268,12 @@ export default function Ads() {
     const cpc          = Number(ins.cpc          || 0)
     const frequency    = Number(ins.frequency    || 0)
     const reach        = Number(ins.reach        || 0)
-    const conversions  = getActionCount(ins.actions, 'purchase')
+    const conversions  = getPurchaseCount(ins.actions)
                        + getActionCount(ins.actions, 'lead')
                        + getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
     const cpa          = conversions > 0 ? spend / conversions : 0
     const revenue      = getPurchaseValue(ins.action_values)
-    const conversionValue = Array.isArray(ins.action_values)
-      ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
-      : 0
+    const conversionValue = revenue
     const reactions    = getActionCount(ins.actions, 'post_reaction')
     const pageLikes    = getActionCount(ins.actions, 'like')
     const comments     = getActionCount(ins.actions, 'comment')

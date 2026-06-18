@@ -366,26 +366,64 @@ export function getActionCount(actions, actionType) {
   return a ? Number(a.value) : 0
 }
 
+// Contagem de compras: mesma lógica de prioridade que getPurchaseValue
+export function getPurchaseCount(actions) {
+  if (!Array.isArray(actions) || actions.length === 0) return 0
+  const PRIORITY = [
+    'omni_purchase',
+    'offsite_conversion.fb_pixel_purchase',
+    'onsite_conversion.fb_pixel_purchase',
+    'purchase',
+    'offsite_conversion.purchase',
+  ]
+  for (const type of PRIORITY) {
+    const a = actions.find((x) => x.action_type === type)
+    if (a && Number(a.value) > 0) return Number(a.value)
+  }
+  const entries = actions.filter(
+    (x) => typeof x.action_type === 'string' &&
+            x.action_type.toLowerCase().includes('purchase') &&
+            Number(x.value) > 0
+  )
+  return entries.length > 0 ? Math.max(...entries.map((x) => Number(x.value))) : 0
+}
+
 export function getActionValue(actionValues, actionType) {
   if (!Array.isArray(actionValues)) return 0
   const av = actionValues.find((x) => x.action_type === actionType)
   return av ? Number(av.value) : 0
 }
 
-// Retorna o valor de vendas da campanha verificando todos os tipos de compra do Meta:
-// omni_purchase (todos os canais) → fb_pixel_purchase (pixel) → purchase (loja/catálogo)
-// Usa o primeiro que tiver valor > 0 para evitar dupla contagem.
+// Retorna o valor de vendas/compras correspondente ao que o Meta Ads Manager exibe.
+// Ordem de prioridade: omni_purchase (todos canais, Meta v17+) → pixel website →
+// onsite (Facebook/Instagram shop) → purchase genérico → offsite genérico →
+// fallback dinâmico: qualquer action_type com "purchase", pegando o maior valor.
 export function getPurchaseValue(actionValues) {
   if (!Array.isArray(actionValues) || actionValues.length === 0) return 0
-  const purchaseTypes = [
+
+  const PRIORITY = [
     'omni_purchase',
     'offsite_conversion.fb_pixel_purchase',
+    'onsite_conversion.fb_pixel_purchase',
     'purchase',
+    'offsite_conversion.purchase',
   ]
-  for (const type of purchaseTypes) {
+
+  for (const type of PRIORITY) {
     const av = actionValues.find((x) => x.action_type === type)
     if (av && Number(av.value) > 0) return Number(av.value)
   }
+
+  // Fallback: qualquer entrada com "purchase" no nome — usa o maior para pegar omni
+  const purchaseEntries = actionValues.filter(
+    (x) => typeof x.action_type === 'string' &&
+            x.action_type.toLowerCase().includes('purchase') &&
+            Number(x.value) > 0
+  )
+  if (purchaseEntries.length > 0) {
+    return Math.max(...purchaseEntries.map((x) => Number(x.value)))
+  }
+
   return 0
 }
 

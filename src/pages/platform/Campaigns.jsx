@@ -13,6 +13,7 @@ import {
   updateCampaignStatus,
   updateCampaignBudget,
   getActionCount,
+  getPurchaseCount,
   getPurchaseValue,
   META_STATUS_LABELS,
   META_OBJECTIVE_LABELS,
@@ -176,15 +177,13 @@ export default function Campaigns() {
     const ctr = Number(ins.ctr || 0)
     const cpc = Number(ins.cpc || 0)
 
-    const purchases = getActionCount(ins.actions, 'purchase')
+    const purchases = getPurchaseCount(ins.actions)
     const whatsapp  = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
     const leads     = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
     const totalConversions = purchases + whatsapp + leads
 
     const revenue = getPurchaseValue(ins.action_values)
-    const conversionValue = Array.isArray(ins.action_values)
-      ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
-      : 0
+    const conversionValue = revenue
     const roas = spend > 0 && revenue > 0 ? revenue / spend : 0
     const cpa  = spend > 0 && totalConversions > 0 ? spend / totalConversions : 0
 

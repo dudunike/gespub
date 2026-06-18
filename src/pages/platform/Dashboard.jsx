@@ -1,5 +1,5 @@
 // Dashboard — métricas reais do Gerenciador de Anúncios Meta Ads
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { IconPlugConnected, IconRefresh, IconRobot, IconAlertCircle, IconTrendingUp, IconHeart, IconUserPlus, IconMessageCircle, IconShare2, IconDownload, IconLock, IconX, IconUsers, IconChartBar } from '@tabler/icons-react'
@@ -10,7 +10,7 @@ import { useMeta } from '../../context/MetaContext'
 import {
   getCampaignInsights,
   getActionCount,
-  getActionValue,
+  getPurchaseCount,
   getPurchaseValue,
   getPageFollowers,
   getInstagramPostStats,
@@ -119,7 +119,12 @@ export default function Dashboard() {
     try {
       const allInsights = await Promise.all(activeAccounts.map(async acc => {
         const data = await getCampaignInsights(acc.account_id, datePreset, timeRange)
-        return data.map(i => ({ ...i, _account_id: acc.account_id, _account_name: acc.account_name || acc.account_id }))
+        return data.map(i => ({
+          ...i,
+          _account_id:   acc.account_id,
+          _account_name: acc.account_name || acc.account_id,
+          _currency:     acc.currency || 'BRL',
+        }))
       }))
       setInsights(allInsights.flat())
       setLastUpdated(new Date())
@@ -178,6 +183,10 @@ export default function Dashboard() {
       .catch(() => {})
   }, [user])
 
+  // ── Detecta se as contas têm moedas diferentes ──
+  const insightCurrencies = [...new Set(insights.map(i => i._currency).filter(Boolean))]
+  const mixedCurrencies   = insightCurrencies.length > 1
+
   // ── Agrega todas as métricas das campanhas ──
   const totalSpend        = insights.reduce((s, i) => s + Number(i.spend        || 0), 0)
   const totalImpressions  = insights.reduce((s, i) => s + Number(i.impressions  || 0), 0)
@@ -191,17 +200,34 @@ export default function Dashboard() {
     : 0
 
   // Conversões por tipo
-  const totalPurchases    = insights.reduce((s, i) => s + getActionCount(i.actions, 'purchase'), 0)
+  const totalPurchases    = insights.reduce((s, i) => s + getPurchaseCount(i.actions), 0)
   const totalWhatsapp     = insights.reduce((s, i) => s + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d'), 0)
   const totalLeads        = insights.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
   const totalConversions  = totalPurchases + totalWhatsapp + totalLeads
 
-  // ROAS, CPA e Receita de Vendas
-  // getPurchaseValue verifica omni_purchase → fb_pixel_purchase → purchase (evita dupla contagem)
+  // ROAS e Receita de Vendas — getPurchaseValue cobre todos os action_types do Meta
+  // Se contas têm moedas diferentes, métricas monetárias por conta são exibidas separadamente
   const totalRevenue      = insights.reduce((s, i) => s + getPurchaseValue(i.action_values), 0)
   const totalConversionValue = totalRevenue
   const roas              = totalSpend > 0 && totalRevenue > 0 ? totalRevenue / totalSpend : 0
   const cpa               = totalSpend > 0 && totalConversions > 0 ? totalSpend / totalConversions : 0
+
+  // Breakdown por conta (para multi-moeda)
+  const accountBreakdown = useMemo(() => {
+    if (!mixedCurrencies) return []
+    const map = {}
+    insights.forEach(i => {
+      const key = i._account_id
+      if (!map[key]) map[key] = { name: i._account_name, currency: i._currency || 'BRL', spend: 0, revenue: 0, conversions: 0 }
+      map[key].spend      += Number(i.spend || 0)
+      map[key].revenue    += getPurchaseValue(i.action_values)
+      map[key].conversions += getPurchaseCount(i.actions) +
+                              getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d') +
+                              getActionCount(i.actions, 'lead') +
+                              getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead')
+    })
+    return Object.values(map)
+  }, [insights, mixedCurrencies])
 
   // Engajamento social (via ações dos anúncios)
   const hasInsights       = insights.length > 0
@@ -295,7 +321,7 @@ export default function Dashboard() {
       const cl  = arr.reduce((s, i) => s + Number(i.clicks || 0), 0)
       const im  = arr.reduce((s, i) => s + Number(i.impressions || 0), 0)
       const rv  = arr.reduce((s, i) => s + getPurchaseValue(i.action_values), 0)
-      const pu  = arr.reduce((s, i) => s + getActionCount(i.actions, 'purchase'), 0)
+      const pu  = arr.reduce((s, i) => s + getPurchaseCount(i.actions), 0)
       const wa  = arr.reduce((s, i) => s + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d'), 0)
       const ld  = arr.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
       const cv  = pu + wa + ld
@@ -748,7 +774,7 @@ ${hasMultiAccounts ? `
       const cl = arr.reduce((s, i) => s + Number(i.clicks || 0), 0)
       const im = arr.reduce((s, i) => s + Number(i.impressions || 0), 0)
       const rv = arr.reduce((s, i) => s + getPurchaseValue(i.action_values), 0)
-      const pu = arr.reduce((s, i) => s + getActionCount(i.actions, 'purchase'), 0)
+      const pu = arr.reduce((s, i) => s + getPurchaseCount(i.actions), 0)
       const wa = arr.reduce((s, i) => s + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d'), 0)
       const ld = arr.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
       const cv = pu + wa + ld
@@ -1167,7 +1193,7 @@ ${cmpSection}
         const re  = Number(i.reach || 0)
         const ct  = im > 0 ? (cl / im) * 100 : 0
         const cp  = cl > 0 ? sp / cl : 0
-        const cv  = getActionCount(i.actions, 'purchase') + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d')
+        const cv  = getPurchaseCount(i.actions) + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d')
         const rv  = getPurchaseValue(i.action_values)
         const r   = sp > 0 && rv > 0 ? rv / sp : 0
         return `<tr>
@@ -1403,6 +1429,47 @@ ${cmpSection}
         />
       </div>
 
+      {/* ── Aviso multi-moeda: breakdown por conta ── */}
+      {mixedCurrencies && !loading && accountBreakdown.length > 0 && (
+        <div className="bg-white border border-border rounded-card p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <IconAlertCircle size={16} className="text-status-warning shrink-0" />
+            <p className="text-sm font-semibold text-txt-primary">Contas com moedas diferentes — valores por conta</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {accountBreakdown.map(acc => (
+              <div key={acc.name} className="bg-surface-bg rounded-input p-3 border border-border">
+                <p className="text-xs font-medium text-txt-secondary truncate mb-2">{acc.name}</p>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-txt-secondary">Investido</span>
+                  <span className="text-sm font-bold text-txt-primary">{formatCurrency(acc.spend, acc.currency)}</span>
+                </div>
+                {acc.revenue > 0 && (
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-xs text-txt-secondary">Receita</span>
+                    <span className="text-sm font-semibold text-status-success">{formatCurrency(acc.revenue, acc.currency)}</span>
+                  </div>
+                )}
+                {acc.revenue > 0 && acc.spend > 0 && (
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-xs text-txt-secondary">ROAS</span>
+                    <span className={`text-sm font-semibold ${acc.revenue / acc.spend >= 3 ? 'text-status-success' : 'text-txt-primary'}`}>
+                      {formatRoas(acc.revenue / acc.spend)}
+                    </span>
+                  </div>
+                )}
+                {acc.conversions > 0 && (
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-xs text-txt-secondary">Conversões</span>
+                    <span className="text-sm font-semibold text-brand-500">{formatNumber(acc.conversions)}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── KPIs terciários (linha 3): CPA ── */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <MetricCard
@@ -1598,7 +1665,7 @@ ${cmpSection}
                 const convValue = Array.isArray(ins.action_values)
                   ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
                   : 0
-                const purchases = getActionCount(ins.actions, 'purchase')
+                const purchases = getPurchaseCount(ins.actions)
                 const whatsapp  = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
                 const leads     = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
                 const convs     = purchases + whatsapp + leads

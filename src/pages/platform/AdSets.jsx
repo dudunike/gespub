@@ -17,6 +17,7 @@ import {
   updateAdSetStatus,
   updateAdSetBudget,
   getActionCount,
+  getPurchaseCount,
   getPurchaseValue,
   META_STATUS_LABELS,
 } from '../../lib/metaApi'
@@ -153,16 +154,14 @@ export default function AdSets() {
     const cpc        = Number(ins.cpc         || 0)
     const frequency  = Number(ins.frequency   || 0)
     const cpm        = Number(ins.cpm         || 0)
-    const purchases  = getActionCount(ins.actions, 'purchase')
+    const purchases  = getPurchaseCount(ins.actions)
     const whatsapp   = getActionCount(ins.actions, 'onsite_conversion.messaging_conversation_started_7d')
     const leads      = getActionCount(ins.actions, 'lead') + getActionCount(ins.actions, 'offsite_conversion.fb_pixel_lead')
     const totalConvs = purchases + whatsapp + leads
     const cpa        = spend > 0 && totalConvs > 0 ? spend / totalConvs : 0
-    const revenue    = getPurchaseValue(ins.action_values)
-    const conversionValue = Array.isArray(ins.action_values)
-      ? ins.action_values.reduce((s, av) => s + Number(av.value || 0), 0)
-      : 0
-    const roas = spend > 0 && revenue > 0 ? revenue / spend : 0
+    const revenue         = getPurchaseValue(ins.action_values)
+    const conversionValue = revenue
+    const roas            = spend > 0 && revenue > 0 ? revenue / spend : 0
 
     return { ...adSet, status, budget, spend, reach, impressions, ctr, cpc, frequency, cpm, purchases, whatsapp, leads, totalConvs, cpa, revenue, conversionValue, roas }
   })
