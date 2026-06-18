@@ -12,14 +12,14 @@ const PRESETS = [
   { id: 'custom',     label: 'Personalizado' },
 ]
 
-// today in YYYY-MM-DD
-function today() {
-  return new Date().toISOString().slice(0, 10)
+// today in YYYY-MM-DD no fuso de Brasília (evita virada de data via UTC)
+function todayBRT() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
 }
 function daysAgo(n) {
   const d = new Date()
   d.setDate(d.getDate() - n)
-  return d.toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d)
 }
 
 /**
@@ -39,7 +39,7 @@ export default function DateFilter({ preset = 'last_30d', since, until, onChange
   const handlePreset = (e) => {
     const val = e.target.value
     if (val === 'custom') {
-      onChange({ preset: 'custom', since: daysAgo(30), until: today() })
+      onChange({ preset: 'custom', since: daysAgo(30), until: todayBRT() })
     } else {
       onChange({ preset: val, since: null, until: null })
     }

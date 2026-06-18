@@ -95,7 +95,7 @@ export default function AdminLogs() {
     if (logs.length === 0) return
     const headers = ['Data/Hora', 'Usuário', 'E-mail', 'Agente', 'Campanha', 'Ação', 'Mensagem', 'Métrica', 'Valor']
     const rows = logs.map(l => [
-      l.executed_at ? new Date(l.executed_at).toLocaleString('pt-BR') : '',
+      l.executed_at ? new Date(l.executed_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '',
       l.profile?.name  || '',
       l.profile?.email || '',
       l.agents?.name    || '',

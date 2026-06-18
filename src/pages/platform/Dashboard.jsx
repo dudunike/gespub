@@ -46,27 +46,30 @@ function MetricCard({ label, value, sub, highlight, color, loading }) {
   )
 }
 
-// ── Helpers de data ──────────────────────────────────────────────────────────
+// ── Helpers de data (sempre no fuso de Brasília) ─────────────────────────────
+const _brtFmt = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d)
+
 function getActualDateRange(preset, customRange) {
   if (customRange?.since && customRange?.until) return customRange
   const now   = new Date()
-  const iso   = (d) => d.toISOString().slice(0, 10)
-  const today = iso(now)
+  const today = _brtFmt(now)
+  const ago   = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return _brtFmt(d) }
   switch (preset) {
-    case 'today':     return { since: today, until: today }
-    case 'yesterday': { const y = new Date(now); y.setDate(y.getDate() - 1);    return { since: iso(y), until: iso(y) } }
-    case 'last_7d':   { const s = new Date(now); s.setDate(s.getDate() - 6);    return { since: iso(s), until: today } }
-    case 'last_14d':  { const s = new Date(now); s.setDate(s.getDate() - 13);   return { since: iso(s), until: today } }
-    case 'last_30d':  { const s = new Date(now); s.setDate(s.getDate() - 29);   return { since: iso(s), until: today } }
+    case 'today':      return { since: today, until: today }
+    case 'yesterday':  { const y = ago(1); return { since: y, until: y } }
+    case 'last_7d':    return { since: ago(6),  until: today }
+    case 'last_14d':   return { since: ago(13), until: today }
+    case 'last_30d':   return { since: ago(29), until: today }
     case 'this_month': {
-      return { since: iso(new Date(now.getFullYear(), now.getMonth(), 1)), until: today }
+      const first = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { since: _brtFmt(first), until: today }
     }
     case 'last_month': {
       const last  = new Date(now.getFullYear(), now.getMonth(), 0)
       const first = new Date(last.getFullYear(), last.getMonth(), 1)
-      return { since: iso(first), until: iso(last) }
+      return { since: _brtFmt(first), until: _brtFmt(last) }
     }
-    default: { const s = new Date(now); s.setDate(s.getDate() - 29); return { since: iso(s), until: today } }
+    default: return { since: ago(29), until: today }
   }
 }
 
@@ -312,7 +315,7 @@ export default function Dashboard() {
     const { since, until } = getActualDateRange(datePreset, timeRange)
     const periodFull  = formatPeriodFull(since, until)
     const periodShort = formatPeriodShort(since, until)
-    const generatedAt = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const generatedAt = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
     // Per-account breakdown
     const accountGroups = {}
@@ -1352,7 +1355,7 @@ ${cmpSection}
           ) : null}
           {lastUpdated && (
             <span className="text-xs text-txt-secondary">
-              Atualizado às {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              Atualizado às {lastUpdated.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
         </div>

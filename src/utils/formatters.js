@@ -42,6 +42,7 @@ export const formatRoas = (value) => {
 export const formatDate = (dateString) => {
   const date = new Date(dateString)
   return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -52,6 +53,7 @@ export const formatDate = (dateString) => {
 export const formatDateTime = (dateString) => {
   const date = new Date(dateString)
   return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
