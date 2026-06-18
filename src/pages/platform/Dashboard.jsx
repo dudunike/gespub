@@ -20,15 +20,22 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { formatCurrency, formatNumber, formatRoas, formatPercent } from '../../utils/formatters'
 
-// KPI Card completo
-function MetricCard({ label, value, sub, highlight, loading }) {
+// KPI Card completo — color: 'green' | 'red' | undefined
+function MetricCard({ label, value, sub, highlight, color, loading }) {
+  const valueClass = color === 'green'
+    ? 'text-status-success'
+    : color === 'red'
+      ? 'text-status-error'
+      : highlight
+        ? 'text-brand-500'
+        : 'text-txt-primary'
   return (
-    <div className="bg-white border border-border rounded-card p-5">
+    <div className={`bg-white border rounded-card p-5 ${color === 'green' ? 'border-status-success/30' : color === 'red' ? 'border-status-error/30' : 'border-border'}`}>
       <p className="text-xs font-medium text-txt-secondary uppercase tracking-wide">{label}</p>
       {loading ? (
         <div className="mt-2 h-8 w-24 bg-surface-bg rounded animate-pulse" />
       ) : (
-        <p className={`mt-1.5 text-2xl font-bold ${highlight ? 'text-brand-500' : 'text-txt-primary'}`}>
+        <p className={`mt-1.5 text-2xl font-bold ${valueClass}`}>
           {value ?? '—'}
         </p>
       )}
@@ -211,6 +218,9 @@ export default function Dashboard() {
   const totalConversionValue = totalRevenue
   const roas              = totalSpend > 0 && totalRevenue > 0 ? totalRevenue / totalSpend : 0
   const cpa               = totalSpend > 0 && totalConversions > 0 ? totalSpend / totalConversions : 0
+  // Lucro = receita de vendas rastreada − investimento em anúncios
+  const lucro             = totalRevenue > 0 ? totalRevenue - totalSpend : null
+  const margemLucro       = lucro !== null && totalRevenue > 0 ? (lucro / totalRevenue) * 100 : null
 
   // Breakdown por conta (para multi-moeda)
   const accountBreakdown = useMemo(() => {
@@ -326,12 +336,13 @@ export default function Dashboard() {
       const ld  = arr.reduce((s, i) => s + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'offsite_conversion.fb_pixel_lead'), 0)
       const cv  = pu + wa + ld
       const r   = sp > 0 && rv > 0 ? rv / sp : 0
-      const cpa = sp > 0 && cv > 0  ? sp / cv : 0
-      const ctr = im > 0 ? (cl / im) * 100 : 0
-      const cpc = cl > 0 ? sp / cl : 0
-      const re2 = arr.reduce((s, i) => s + getActionCount(i.actions, 'post_reaction'), 0)
-      const cm  = arr.reduce((s, i) => s + getActionCount(i.actions, 'comment'), 0)
-      return { sp, re, cl, im, rv, pu, wa, ld, cv, r, cpa, ctr, cpc, re2, cm }
+      const cpa  = sp > 0 && cv > 0  ? sp / cv : 0
+      const lc   = rv > 0 ? rv - sp : 0
+      const ctr  = im > 0 ? (cl / im) * 100 : 0
+      const cpc  = cl > 0 ? sp / cl : 0
+      const re2  = arr.reduce((s, i) => s + getActionCount(i.actions, 'post_reaction'), 0)
+      const cm   = arr.reduce((s, i) => s + getActionCount(i.actions, 'comment'), 0)
+      return { sp, re, cl, im, rv, pu, wa, ld, cv, r, cpa, lc, ctr, cpc, re2, cm }
     }
 
     const prevT = compareData.length > 0 ? calcTotals(compareData) : null
@@ -641,10 +652,24 @@ function compartilhar(){
   <div class="kpi">
     <span class="kpi-icon">📈</span>
     <div class="kpi-val" style="color:#16a34a">${fC(totalRevenue)}</div>
-    <div class="kpi-lbl">Receita gerada</div>
-    <div class="kpi-sub">retorno atribuído</div>
+    <div class="kpi-lbl">Receita de vendas</div>
+    <div class="kpi-sub">retorno atribuído aos anúncios</div>
     ${delta(totalRevenue, prevT?.rv)}
   </div>` : ''}
+  ${totalRevenue > 0 ? (() => {
+    const lc = totalRevenue - totalSpend
+    const lc_color = lc >= 0 ? '#16a34a' : '#dc2626'
+    const lc_bg    = lc >= 0 ? '#f0fdf4' : '#fef2f2'
+    const lc_icon  = lc >= 0 ? '🟢' : '🔴'
+    const lc_pct   = totalRevenue > 0 ? ((lc / totalRevenue) * 100).toFixed(1) : '0'
+    return `
+  <div class="kpi" style="background:${lc_bg};border:1.5px solid ${lc_color}22">
+    <span class="kpi-icon">${lc_icon}</span>
+    <div class="kpi-val" style="color:${lc_color}">${fC(lc)}</div>
+    <div class="kpi-lbl">Lucro (anúncios)</div>
+    <div class="kpi-sub">Margem ${lc_pct}% · Receita − Gasto</div>
+  </div>`
+  })() : ''}
   ${totalConversions > 0 ? `
   <div class="kpi">
     <span class="kpi-icon">🎯</span>
@@ -677,7 +702,7 @@ ${roas > 0 ? `
 <div class="card">
   <div class="roas-row">
     <div class="roas-num">${roas.toFixed(2)}×</div>
-    <div class="roas-explain">Para cada <span class="roas-hl">R$ 1,00</span> investido, <span class="roas-hl">R$ ${roas.toFixed(2)}</span> retornou — esse é o seu <span class="roas-hl">ROAS</span> (retorno sobre investimento em anúncios).</div>
+    <div class="roas-explain">Para cada <span class="roas-hl">${fC(1)}</span> investido, <span class="roas-hl">${fC(roas)}</span> retornou em vendas — esse é o seu <span class="roas-hl">ROAS</span> (retorno sobre investimento em anúncios).</div>
   </div>
 </div>` : ''}
 
@@ -1072,11 +1097,21 @@ function compartilhar(){
     ${deltaR(totalSpend, prevT?.sp, true)}
   </div>
   <div class="kpi">
-    <div class="kpi-lbl">📈 Receita Gerada</div>
+    <div class="kpi-lbl">📈 Receita de Vendas</div>
     <div class="kpi-val ${totalRevenue > 0 ? 'g' : ''}">${totalRevenue > 0 ? fC(totalRevenue) : '—'}</div>
     <div class="kpi-sub">${totalRevenue > 0 ? 'Valor atribuído às compras' : 'Sem rastreamento de compras'}</div>
     ${deltaR(totalRevenue, prevT?.rv)}
   </div>
+  ${totalRevenue > 0 ? (() => {
+    const lc = totalRevenue - totalSpend
+    const lc_pct = totalRevenue > 0 ? ((lc / totalRevenue) * 100).toFixed(1) : '0'
+    return `
+  <div class="kpi" style="${lc >= 0 ? 'border-left:3px solid #16a34a' : 'border-left:3px solid #dc2626'}">
+    <div class="kpi-lbl">💰 Lucro (anúncios)</div>
+    <div class="kpi-val ${lc >= 0 ? 'g' : ''}" style="${lc < 0 ? 'color:#dc2626' : ''}">${fC(lc)}</div>
+    <div class="kpi-sub">Margem ${lc_pct}% · Receita − Gasto</div>
+  </div>`
+  })() : ''}
   <div class="kpi">
     <div class="kpi-lbl">⚡ ROAS</div>
     <div class="kpi-val ${roas >= 3 ? 'g' : roas > 0 ? 'p' : ''}">${roas > 0 ? roas.toFixed(2) + '×' : '—'}</div>
@@ -1104,6 +1139,8 @@ ${cmpSection}
     <div class="m-item"><div class="m-lbl">CPM</div><div class="m-val">${avgCpm > 0 ? fC(avgCpm) : '—'}</div></div>
     <div class="m-item"><div class="m-lbl">Frequência</div><div class="m-val">${avgFrequency > 0 ? avgFrequency.toFixed(1) + '×' : '—'}</div></div>
     <div class="m-item"><div class="m-lbl">CPA</div><div class="m-val">${cpa > 0 ? fC(cpa) : '—'}</div></div>
+    ${totalRevenue > 0 ? `<div class="m-item" style="${totalRevenue - totalSpend >= 0 ? 'border-left:2px solid #16a34a' : 'border-left:2px solid #dc2626'}"><div class="m-lbl">Lucro Ads</div><div class="m-val" style="color:${totalRevenue - totalSpend >= 0 ? '#16a34a' : '#dc2626'}">${fC(totalRevenue - totalSpend)}</div></div>` : ''}
+    ${totalRevenue > 0 ? `<div class="m-item"><div class="m-lbl">Margem</div><div class="m-val" style="color:${totalRevenue - totalSpend >= 0 ? '#16a34a' : '#dc2626'}">${((((totalRevenue - totalSpend) / totalRevenue) * 100)).toFixed(1)}%</div></div>` : ''}
   </div>
 </div>
 
@@ -1177,13 +1214,13 @@ ${cmpSection}
     <thead><tr>
       <th style="text-align:left">Campanha</th>
       <th>Investido</th>
+      <th>Receita</th>
+      <th>Lucro</th>
+      <th>ROAS</th>
       <th>Alcance</th>
-      <th>Impressões</th>
       <th>Cliques</th>
       <th>CTR</th>
-      <th>CPC</th>
       <th>Conversões</th>
-      <th>ROAS</th>
     </tr></thead>
     <tbody>
       ${sortedC.map(i => {
@@ -1192,32 +1229,32 @@ ${cmpSection}
         const cl  = Number(i.clicks || 0)
         const re  = Number(i.reach || 0)
         const ct  = im > 0 ? (cl / im) * 100 : 0
-        const cp  = cl > 0 ? sp / cl : 0
         const cv  = getPurchaseCount(i.actions) + getActionCount(i.actions, 'lead') + getActionCount(i.actions, 'onsite_conversion.messaging_conversation_started_7d')
         const rv  = getPurchaseValue(i.action_values)
         const r   = sp > 0 && rv > 0 ? rv / sp : 0
+        const lc  = rv > 0 ? rv - sp : null
         return `<tr>
           <td class="td-name" data-label="Campanha" title="${i.campaign_name}">${i.campaign_name || '—'}</td>
           <td data-label="Investido"><strong>${fC(sp)}</strong></td>
+          <td data-label="Receita" style="color:${rv > 0 ? '#16a34a' : '#a1a1aa'}">${rv > 0 ? fC(rv) : '—'}</td>
+          <td data-label="Lucro" style="color:${lc !== null ? (lc >= 0 ? '#16a34a' : '#dc2626') : '#a1a1aa'};font-weight:${lc !== null ? '700' : '400'}">${lc !== null ? fC(lc) : '—'}</td>
+          <td data-label="ROAS">${scorePill(r)}</td>
           <td class="td-sec" data-label="Alcance">${fN(re)}</td>
-          <td class="td-sec" data-label="Impressões">${fN(im)}</td>
           <td class="td-sec" data-label="Cliques">${fN(cl)}</td>
           <td class="td-sec" data-label="CTR">${fP(ct)}</td>
-          <td class="td-sec" data-label="CPC">${cp > 0 ? fC(cp) : '—'}</td>
           <td data-label="Conversões">${cv > 0 ? fN(cv) : '—'}</td>
-          <td data-label="ROAS">${scorePill(r)}</td>
         </tr>`
       }).join('')}
       <tr class="total-row">
         <td data-label="Total">TOTAL GERAL</td>
         <td data-label="Investido">${fC(totalSpend)}</td>
+        <td data-label="Receita" style="color:${totalRevenue > 0 ? '#16a34a' : '#a1a1aa'}">${totalRevenue > 0 ? fC(totalRevenue) : '—'}</td>
+        <td data-label="Lucro" style="color:${totalRevenue > 0 ? (totalRevenue - totalSpend >= 0 ? '#16a34a' : '#dc2626') : '#a1a1aa'}">${totalRevenue > 0 ? fC(totalRevenue - totalSpend) : '—'}</td>
+        <td data-label="ROAS">${scorePill(roas)}</td>
         <td data-label="Alcance">${fN(totalReach)}</td>
-        <td data-label="Impressões">${fN(totalImpressions)}</td>
         <td data-label="Cliques">${fN(totalClicks)}</td>
         <td data-label="CTR">${fP(avgCtr)}</td>
-        <td data-label="CPC">${avgCpc > 0 ? fC(avgCpc) : '—'}</td>
         <td data-label="Conversões">${totalConversions > 0 ? fN(totalConversions) : '—'}</td>
-        <td data-label="ROAS">${scorePill(roas)}</td>
       </tr>
     </tbody>
   </table>
@@ -1450,6 +1487,17 @@ ${cmpSection}
                     <span className="text-sm font-semibold text-status-success">{formatCurrency(acc.revenue, acc.currency)}</span>
                   </div>
                 )}
+                {acc.revenue > 0 && acc.spend > 0 && (() => {
+                  const accLucro = acc.revenue - acc.spend
+                  return (
+                    <div className="flex items-baseline justify-between mt-1">
+                      <span className="text-xs text-txt-secondary">Lucro</span>
+                      <span className={`text-sm font-semibold ${accLucro >= 0 ? 'text-status-success' : 'text-status-error'}`}>
+                        {formatCurrency(accLucro, acc.currency)}
+                      </span>
+                    </div>
+                  )
+                })()}
                 {acc.revenue > 0 && acc.spend > 0 && (
                   <div className="flex items-baseline justify-between mt-1">
                     <span className="text-xs text-txt-secondary">ROAS</span>
@@ -1470,8 +1518,27 @@ ${cmpSection}
         </div>
       )}
 
-      {/* ── KPIs terciários (linha 3): CPA ── */}
+      {/* ── KPIs terciários (linha 3): Lucro, Gasto e CPA ── */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <MetricCard
+          label="Lucro (ads)"
+          value={lucro !== null ? formatCurrency(lucro, currency) : '—'}
+          sub={
+            lucro !== null
+              ? lucro >= 0
+                ? margemLucro !== null ? `Margem ${margemLucro.toFixed(1)}%` : 'Receita supera o investimento'
+                : `Déficit de ${formatCurrency(Math.abs(lucro), currency)}`
+              : 'Sem receita de vendas rastreada'
+          }
+          color={lucro !== null ? (lucro >= 0 ? 'green' : 'red') : undefined}
+          loading={loading}
+        />
+        <MetricCard
+          label="Gasto com anúncios"
+          value={totalSpend > 0 ? formatCurrency(totalSpend, currency) : '—'}
+          sub={`${insights.length} campanha${insights.length !== 1 ? 's' : ''} no período`}
+          loading={loading}
+        />
         <MetricCard
           label="CPA (custo/resultado)"
           value={cpa > 0 ? formatCurrency(cpa, currency) : '—'}
