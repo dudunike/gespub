@@ -12,7 +12,6 @@ const PRESETS = [
   { id: 'custom',     label: 'Personalizado' },
 ]
 
-// today in YYYY-MM-DD no fuso de Brasília (evita virada de data via UTC)
 function todayBRT() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
 }
@@ -22,26 +21,35 @@ function daysAgo(n) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d)
 }
 
-/**
- * DateFilter — selector de período para relatórios
- *
- * Props:
- *   preset      string   — preset ativo ('last_30d', 'custom', ...)
- *   since       string   — YYYY-MM-DD (usado quando preset === 'custom')
- *   until       string   — YYYY-MM-DD (usado quando preset === 'custom')
- *   onChange({ preset, since, until }) — callback ao mudar período
- *   onRefresh() — callback ao clicar em Atualizar
- *   loading     bool
- */
 export default function DateFilter({ preset = 'last_30d', since, until, onChange, onRefresh, loading }) {
   const isCustom = preset === 'custom'
+
+  // Estado local para as datas — evita dependência do round-trip pelo pai
+  const [customSince, setCustomSince] = useState(() => since || daysAgo(30))
+  const [customUntil, setCustomUntil] = useState(() => until || todayBRT())
 
   const handlePreset = (e) => {
     const val = e.target.value
     if (val === 'custom') {
-      onChange({ preset: 'custom', since: daysAgo(30), until: todayBRT() })
+      onChange({ preset: 'custom', since: customSince, until: customUntil })
     } else {
       onChange({ preset: val, since: null, until: null })
+    }
+  }
+
+  const handleSinceChange = (e) => {
+    const s = e.target.value
+    setCustomSince(s)
+    if (s && customUntil) {
+      onChange({ preset: 'custom', since: s, until: customUntil })
+    }
+  }
+
+  const handleUntilChange = (e) => {
+    const u = e.target.value
+    setCustomUntil(u)
+    if (customSince && u) {
+      onChange({ preset: 'custom', since: customSince, until: u })
     }
   }
 
@@ -66,18 +74,18 @@ export default function DateFilter({ preset = 'last_30d', since, until, onChange
         <>
           <input
             type="date"
-            value={since || ''}
-            max={until || today()}
-            onChange={(e) => onChange({ preset: 'custom', since: e.target.value, until })}
+            value={customSince}
+            max={customUntil || todayBRT()}
+            onChange={handleSinceChange}
             className="px-2 py-1.5 text-sm border border-border rounded-input bg-white text-txt-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
           />
           <span className="text-xs text-txt-secondary">até</span>
           <input
             type="date"
-            value={until || ''}
-            min={since || undefined}
-            max={today()}
-            onChange={(e) => onChange({ preset: 'custom', since, until: e.target.value })}
+            value={customUntil}
+            min={customSince || undefined}
+            max={todayBRT()}
+            onChange={handleUntilChange}
             className="px-2 py-1.5 text-sm border border-border rounded-input bg-white text-txt-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
           />
         </>
@@ -87,7 +95,7 @@ export default function DateFilter({ preset = 'last_30d', since, until, onChange
       {onRefresh && (
         <button
           onClick={onRefresh}
-          disabled={loading || (isCustom && (!since || !until))}
+          disabled={loading || (isCustom && (!customSince || !customUntil))}
           className="flex items-center gap-1.5 text-xs text-txt-secondary hover:text-brand-500 transition-colors disabled:opacity-40 px-2 py-1.5 rounded-input hover:bg-surface-bg"
         >
           <IconRefresh size={14} className={loading ? 'animate-spin' : ''} />
