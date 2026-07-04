@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   const { data: { user }, error: authErr } = await supabase.auth.getUser(auth.replace('Bearer ', ''))
   if (authErr || !user) return res.status(401).json({ error: 'Token inválido' })
 
-  const { path, params = {}, method = 'GET', body = null } = req.body
+  const { path, params = {}, method = 'GET', body = null, testToken = null } = req.body
   if (!path) return res.status(400).json({ error: 'path é obrigatório' })
 
   // 1. Whitelist de paths permitidos para evitar SSRF
@@ -131,16 +131,29 @@ export default async function handler(req, res) {
     return res.status(200).json(data)
   }
 
-  // Busca o access_token da conexão ativa do usuário
-  const { data: conn } = await supabase
-    .from('meta_connections')
-    .select('access_token')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
+  // Token de acesso: por padrão usa a conexão ativa do usuário.
+  // Exceção: admin pode passar um testToken (ex: token do Graph API Explorer)
+  // para validar permissões no painel sem depender de uma conta conectada via OAuth.
+  let accessToken = null
 
-  if (!conn || !conn.access_token) {
-    return res.status(400).json({ error: 'Nenhuma conexão ativa do Meta encontrada' })
+  if (testToken) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas admin pode usar testToken' })
+    }
+    accessToken = testToken
+  } else {
+    const { data: conn } = await supabase
+      .from('meta_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
+
+    if (!conn || !conn.access_token) {
+      return res.status(400).json({ error: 'Nenhuma conexão ativa do Meta encontrada' })
+    }
+    accessToken = conn.access_token
   }
 
   try {
@@ -151,7 +164,7 @@ export default async function handler(req, res) {
 
     const options = {
       method,
-      headers: { Authorization: `Bearer ${conn.access_token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     }
     if (body && method !== 'GET') {
       options.headers['Content-Type'] = 'application/json'

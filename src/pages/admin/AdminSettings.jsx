@@ -54,7 +54,7 @@ const META_TESTS = [
   },
 ]
 
-async function callProxy(path, params) {
+async function callProxy(path, params, testToken) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Sem sessão ativa')
   const res = await fetch('/api/meta-proxy', {
@@ -63,7 +63,7 @@ async function callProxy(path, params) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ path, params }),
+    body: JSON.stringify({ path, params, testToken: testToken || undefined }),
   })
   return res.json()
 }
@@ -89,13 +89,18 @@ export default function AdminSettings() {
   const [testResults, setTestResults] = useState({})
   const [testRunning, setTestRunning] = useState(false)
 
+  const [metaCreds, setMetaCreds] = useState({ appId: '', appSecret: '', permanentToken: '' })
+  const [showAppSecret, setShowAppSecret] = useState(false)
+  const [showToken, setShowToken] = useState(false)
+  const [metaCredsSaved, setMetaCredsSaved] = useState(false)
+
   const runAllTests = async () => {
     setTestRunning(true)
     setTestResults({})
     for (const test of META_TESTS) {
       setTestResults(prev => ({ ...prev, [test.id]: { status: 'running' } }))
       try {
-        const data = await callProxy(test.path, test.params)
+        const data = await callProxy(test.path, test.params, metaCreds.permanentToken)
         if (data.error) {
           setTestResults(prev => ({ ...prev, [test.id]: { status: 'error', message: data.error } }))
         } else {
@@ -128,6 +133,7 @@ export default function AdminSettings() {
         setAlerts(getVal('alert_config', alerts))
         setSystemConfig(getVal('system_config', SYSTEM_CONFIG))
         setAiConfig(getVal('ai_config', aiConfig))
+        setMetaCreds(getVal('meta_credentials', metaCreds))
       }
     }
     loadSettings()
@@ -354,7 +360,47 @@ export default function AdminSettings() {
       </Section>
 
       {/* TESTE DE INTEGRAÇÃO META */}
-      <Section title="Teste de Integração Meta API" description="Executa as chamadas obrigatórias para verificação do App Review do Facebook. Requer conta Meta conectada.">
+      <Section title="Teste de Integração Meta API" description="Executa as chamadas obrigatórias para verificação do App Review do Facebook.">
+        <div className="p-4 bg-surface-bg border border-border rounded-input space-y-3">
+          <p className="text-xs font-semibold text-txt-secondary uppercase tracking-wide">Credenciais Meta (para testar sem OAuth)</p>
+          <p className="text-xs text-txt-secondary -mt-2">
+            Cole aqui um token gerado no <span className="font-medium">Graph API Explorer</span> (developers.facebook.com) para rodar os testes abaixo sem depender de uma conta conectada via login. Isso NÃO substitui as variáveis de ambiente <span className="font-mono">VITE_META_APP_ID</span> / <span className="font-mono">META_APP_SECRET</span> usadas no fluxo real de OAuth — serve apenas para validar as permissões aqui no painel.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="App ID" name="metaAppId" placeholder="2072345476678142"
+              value={metaCreds.appId || ''} onChange={(e) => setMetaCreds(p => ({ ...p, appId: e.target.value }))} />
+            <div>
+              <label className="text-sm font-medium text-txt-primary block mb-1.5">App Secret</label>
+              <div className="relative">
+                <input type={showAppSecret ? 'text' : 'password'} value={metaCreds.appSecret || ''}
+                  onChange={(e) => setMetaCreds(p => ({ ...p, appSecret: e.target.value }))}
+                  placeholder="••••••••••••••••"
+                  className="w-full px-3 py-2 pr-10 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
+                <button type="button" onClick={() => setShowAppSecret(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-secondary hover:text-txt-primary">
+                  {showAppSecret ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-txt-primary block mb-1.5">Token Permanente (User ou System User Token)</label>
+            <div className="relative">
+              <input type={showToken ? 'text' : 'password'} value={metaCreds.permanentToken || ''}
+                onChange={(e) => setMetaCreds(p => ({ ...p, permanentToken: e.target.value }))}
+                placeholder="EAAG..."
+                className="w-full px-3 py-2 pr-10 text-sm border border-border rounded-input focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
+              <button type="button" onClick={() => setShowToken(s => !s)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-secondary hover:text-txt-primary">
+                {showToken ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+              </button>
+            </div>
+          </div>
+          <Button icon={metaCredsSaved ? IconCheck : IconDeviceFloppy} onClick={async () => { await saveSetting('meta_credentials', metaCreds); setMetaCredsSaved(true); setTimeout(() => setMetaCredsSaved(false), 2500) }}>
+            {metaCredsSaved ? 'Salvo!' : 'Salvar credenciais'}
+          </Button>
+        </div>
+
         <div className="space-y-3">
           {META_TESTS.map((test) => {
             const r = testResults[test.id]
